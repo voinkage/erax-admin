@@ -13,16 +13,13 @@ if (!pool) {
   console.warn('⚠️ Kitaplar route: DIGIBUCH_DB (digibuchPool) yapılandırılmamış; kitaplar API çalışmayacak.');
 }
 
-/** GET / - Tüm kitapları listele. Öğrenci: sadece aktif. */
-router.get('/', authenticateToken, authorizeRoles('admin', 'ogretmen', 'ogrenci'), async (req, res) => {
+/** GET / - Admin: kitap listesi (sadece admin; öğrenci/öğretmen listesi eradil-mufredat'tan) */
+router.get('/', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   try {
     if (!pool) return res.status(503).json({ success: false, message: 'Kitaplar servisi yapılandırılmamış' });
-    const userRol = req.user.rol || req.user.role;
-    const isOgrenci = userRol === 'ogrenci';
-    const whereClause = isOgrenci ? " WHERE k.durum = 'aktif'" : '';
     const { rows } = await pool.query(`
       SELECT k.*, (SELECT COUNT(*)::int FROM kitap_sorulari WHERE kitap_id = k.id) AS soru_sayisi
-      FROM kitaplar k${whereClause}
+      FROM kitaplar k
       ORDER BY k.id DESC
     `);
     return res.json({ success: true, data: rows });
@@ -52,8 +49,8 @@ router.post('/', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (
   }
 });
 
-/** GET /:id - Kitap detayı + sorular */
-router.get('/:id', authenticateToken, async (req, res) => {
+/** GET /:id - Admin: kitap önizleme (sadece admin; öğrenci/öğretmen detay eradil-mufredat'tan) */
+router.get('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   try {
     if (!pool) return res.status(503).json({ success: false, message: 'Kitaplar servisi yapılandırılmamış' });
     const { id } = req.params;

@@ -9,82 +9,21 @@ const { icerikPool: pool, organizasyonPool, seviyePool } = require('../config/da
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const { validateSoruEkle, validateSoruGuncelle } = require('./soru-turleri');
 
-// Tüm etkinlikleri listele
-router.get('/', authenticateToken, async (req, res) => {
+// Admin: etkinlik listesi (sadece admin; öğrenci/öğretmen listesi eradil-etkinlik'ten)
+router.get('/', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   try {
-    let query = '';
-    let params = [];
     let paramIndex = 1;
-
-    const userRol = req.user.rol || req.user.role;
     const { kategori } = req.query;
-
-    if (userRol === 'admin') {
-      query = `SELECT etkinlikler.*, (SELECT COUNT(*)::int FROM etkinlik_sorulari WHERE etkinlik_id = etkinlikler.id) AS soru_sayisi FROM etkinlikler WHERE 1=1`;
-      if (kategori) {
-        query += ` AND (ana_kategori = $${paramIndex} OR (ana_kategori IS NULL AND kategori = $${paramIndex + 1}))`;
-        params.push(kategori, kategori);
-        paramIndex += 2;
-      }
-      query += ' ORDER BY olusturma_tarihi DESC';
-    } else if (userRol === 'ogretmen') {
-      query = `
-        SELECT etkinlikler.*, (SELECT COUNT(*)::int FROM etkinlik_sorulari WHERE etkinlik_id = etkinlikler.id) AS soru_sayisi FROM etkinlikler 
-        WHERE (
-          (olusturan_id = $${paramIndex} AND olusturan_rol = 'ogretmen') 
-          OR (olusturan_rol = 'admin')
-        )
-      `;
-      params = [req.user.id];
-      paramIndex++;
-      if (kategori) {
-        query += ` AND (ana_kategori = $${paramIndex} OR (ana_kategori IS NULL AND kategori = $${paramIndex + 1}))`;
-        params.push(kategori, kategori);
-        paramIndex += 2;
-      }
-      query += ' ORDER BY olusturma_tarihi DESC';
-    } else if (userRol === 'ogrenci') {
-      let sinifSeviyeleri = [];
-      if (organizasyonPool) {
-        try {
-          const { rows: os } = await organizasyonPool.query(
-            `SELECT DISTINCT s.sinif_seviyesi FROM ogrenci_sinif os
-             JOIN siniflar s ON s.id = os.sinif_id
-             WHERE os.ogrenci_id = $1 AND (os.durum = 'aktif' OR os.durum IS NULL)`,
-            [req.user.id]
-          );
-          sinifSeviyeleri = (os || []).map((r) => r.sinif_seviyesi).filter((v) => v != null);
-        } catch (err) {
-          console.warn('Öğrenci sınıf seviyeleri alınamadı:', err.message);
-        }
-      }
-      if (sinifSeviyeleri.length === 0) {
-        query = 'SELECT etkinlikler.*, 0 AS soru_sayisi FROM etkinlikler WHERE 1=0';
-        params = [];
-      } else {
-        const ph = sinifSeviyeleri.map((_, i) => `$${i + 1}`).join(',');
-        query = `
-          SELECT e.*, (SELECT COUNT(*)::int FROM etkinlik_sorulari WHERE etkinlik_id = e.id) AS soru_sayisi FROM etkinlikler e
-          WHERE e.sinif_seviyesi IN (${ph})
-            AND EXISTS (SELECT 1 FROM etkinlik_sorulari es WHERE es.etkinlik_id = e.id)
-          ORDER BY e.olusturma_tarihi DESC
-        `;
-        params = [...sinifSeviyeleri];
-        if (kategori) {
-          query = query.replace('ORDER BY', `AND (e.ana_kategori = $${params.length + 1} OR (e.ana_kategori IS NULL AND e.kategori = $${params.length + 2})) ORDER BY`);
-          params.push(kategori, kategori);
-        }
-      }
-    } else {
-      query = 'SELECT etkinlikler.*, 0 AS soru_sayisi FROM etkinlikler WHERE 1=0';
+    let query = `SELECT etkinlikler.*, (SELECT COUNT(*)::int FROM etkinlik_sorulari WHERE etkinlik_id = etkinlikler.id) AS soru_sayisi FROM etkinlikler WHERE 1=1`;
+    const params = [];
+    if (kategori) {
+      query += ` AND (ana_kategori = $${paramIndex} OR (ana_kategori IS NULL AND kategori = $${paramIndex + 1}))`;
+      params.push(kategori, kategori);
     }
+    query += ' ORDER BY olusturma_tarihi DESC';
 
     const { rows: etkinlikler } = await pool.query(query, params);
-
-    res.json({
-      success: true,
-      data: etkinlikler
-    });
+    res.json({ success: true, data: etkinlikler });
   } catch (error) {
     console.error('Etkinlik listeleme hatası:', error);
     res.status(500).json({
@@ -223,8 +162,8 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Etkinlik detayı ve soruları
-router.get('/:id', authenticateToken, async (req, res) => {
+// Admin: etkinlik önizleme (sadece admin; öğrenci/öğretmen detay eradil-etkinlik'ten)
+router.get('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   try {
     const { id } = req.params;
 
