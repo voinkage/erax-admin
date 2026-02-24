@@ -108,14 +108,15 @@ async function purgeWebsiteCache() {
         return { purged: 0, failed: 0 };
     }
     const urls = [
-        `${base}/website/kod/genel.txt`,
-        `${base}/website/kod/dock-siralamasi/kids.txt`,
-        `${base}/website/kod/dock-siralamasi/junior.txt`,
-        `${base}/website/kod/dock-siralamasi/teenager.txt`,
-        `${base}/website/kod/dock-siralamasi/admin.txt`,
+        `${base}/website/kod/genel.json`,
+        `${base}/website/kod/dock-siralamasi/kids.json`,
+        `${base}/website/kod/dock-siralamasi/junior.json`,
+        `${base}/website/kod/dock-siralamasi/teenager.json`,
+        `${base}/website/kod/dock-siralamasi/admin.json`,
         `${base}/website/kod/logolar/kids.svg`,
         `${base}/website/kod/logolar/junior.svg`,
-        `${base}/website/kod/logolar/teenager.svg`
+        `${base}/website/kod/logolar/teenager.svg`,
+        `${base}/website/kod/logolar/admin.svg`
     ];
     let purged = 0, failed = 0;
     for (const url of urls) {
