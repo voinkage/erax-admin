@@ -9,7 +9,7 @@ const fileUploader = require('../utils/fileUploader');
 
 router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   try {
-    const { rol, okul_id, sinif_id, sinif_ids, tc_kimlik_no, lisans_suresi_baslangic, lisans_suresi_bitis } = req.body;
+    const { rol, okul_id, sinif_id, sinif_ids, tc_kimlik_no, lisans_suresi_baslangic, lisans_suresi_bitis, tanimli_ad_soyad, tanimli_kullanici_adi } = req.body;
     if (!rol || !['ogretmen', 'ogrenci'].includes(rol)) {
       return res.status(400).json({ success: false, message: 'Geçerli bir rol belirtilmelidir (ogretmen veya ogrenci). Admin rolü için aktivasyon kodu oluşturulamaz.' });
     }
@@ -50,14 +50,28 @@ router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) =>
       const sinifIdNumbers = sinif_ids.map(id => Number(id)).filter(id => !isNaN(id));
       if (sinifIdNumbers.length > 0) sinifIdsJson = JSON.stringify(sinifIdNumbers);
     }
+    const tanimliAdSoyadVal = (tanimli_ad_soyad != null && String(tanimli_ad_soyad).trim() !== '') ? String(tanimli_ad_soyad).trim() : null;
+    const tanimliKullaniciAdiVal = (tanimli_kullanici_adi != null && String(tanimli_kullanici_adi).trim() !== '') ? String(tanimli_kullanici_adi).trim() : null;
+    const tcKimlikVal = (tc_kimlik_no != null && String(tc_kimlik_no).trim() !== '') ? String(tc_kimlik_no).trim() : null;
+
     const { rows: result } = await pool.query(
-      'INSERT INTO aktivasyon_kodlari (kod, rol, okul_id, sinif_id, sinif_ids, tc_kimlik_no, lisans_suresi_baslangic, lisans_suresi_bitis, olusturan_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
-      [kod, rol, okul_id, finalSinifId, sinifIdsJson, tc_kimlik_no || null, lisans_suresi_baslangic, lisans_suresi_bitis, req.user.id]
+      'INSERT INTO aktivasyon_kodlari (kod, rol, okul_id, sinif_id, sinif_ids, tc_kimlik_no, lisans_suresi_baslangic, lisans_suresi_bitis, olusturan_id, tanimli_ad_soyad, tanimli_kullanici_adi) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id',
+      [kod, rol, okul_id, finalSinifId, sinifIdsJson, tcKimlikVal, lisans_suresi_baslangic, lisans_suresi_bitis, req.user.id, tanimliAdSoyadVal, tanimliKullaniciAdiVal]
     );
     res.status(201).json({
       success: true,
       message: 'Aktivasyon kodu başarıyla oluşturuldu',
-      data: { id: result[0].id, kod, rol, okul_id, sinif_id: finalSinifId || null, sinif_ids: sinifIdsJson ? JSON.parse(sinifIdsJson) : null }
+      data: {
+        id: result[0].id,
+        kod,
+        rol,
+        okul_id,
+        sinif_id: finalSinifId || null,
+        sinif_ids: sinifIdsJson ? JSON.parse(sinifIdsJson) : null,
+        tanimli_ad_soyad: tanimliAdSoyadVal,
+        tanimli_kullanici_adi: tanimliKullaniciAdiVal,
+        tc_kimlik_no: tcKimlikVal
+      }
     });
   } catch (error) {
     console.error('Aktivasyon kodu oluşturma hatası:', error);
