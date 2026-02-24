@@ -72,6 +72,15 @@ router.post('/upload', authenticateToken, authorizeRoles('admin'), uploadMw.sing
       if (typeof fileUploader.purgeCache === 'function') {
         fileUploader.purgeCache(publicUrl).catch(() => {});
       }
+      if (folderPath.startsWith('website/kod')) {
+        if (typeof fileUploader.purgeWebsiteCache === 'function') {
+          fileUploader.purgeWebsiteCache().then((r) => {
+            if (r && (r.purged > 0 || r.failed > 0)) {
+              console.log('CDN website/kod purge:', r.purged, 'purged,', r.failed, 'failed');
+            }
+          }).catch((err) => console.warn('CDN website/kod purge hatası:', err.message));
+        }
+      }
     }
     return res.json({
       success: true,
