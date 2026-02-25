@@ -37,7 +37,7 @@ router.get('/', authenticateToken, authorizeRoles('admin'), async (req, res) => 
 // Etkinlik ekle
 router.post('/', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
   try {
-    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
+    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
 
     if (!ad) {
       return res.status(400).json({ success: false, message: 'Etkinlik adı gereklidir' });
@@ -49,8 +49,8 @@ router.post('/', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (
     const userRol = req.user.rol || req.user.role;
     const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
     const result = await pool.query(
-      `INSERT INTO etkinlikler (ad, aciklama, kategori, sinif_seviyesi, olusturan_id, olusturan_rol, durum, tur, toplam_puan, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
-      [ad, aciklama || null, kategori || null, sinif_seviyesi, req.user.id, userRol, durum || 'aktif', null, toplam_puan || null, gorsel_yolu || null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel)]
+      `INSERT INTO etkinlikler (ad, aciklama, kategori, sinif_seviyesi, olusturan_id, olusturan_rol, durum, tur, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
+      [ad, aciklama || null, kategori || null, sinif_seviyesi, req.user.id, userRol, durum || 'aktif', null, toplam_puan || null, toplam_yildiz || null, gorsel_yolu || null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel)]
     );
 
     res.status(201).json({
@@ -71,7 +71,7 @@ router.post('/', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
+    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
 
     const { rows: etkinlikler } = await pool.query(
       'SELECT olusturan_id, olusturan_rol FROM etkinlikler WHERE id = $1',
@@ -90,8 +90,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
     const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
     await pool.query(
-      'UPDATE etkinlikler SET ad = $1, aciklama = $2, kategori = $3, sinif_seviyesi = $4, durum = $5, toplam_puan = $6, gorsel_yolu = $7, ses_ikonu_gorsel = $8, ilerleme_butonu_gorsel = $9, geri_butonu_gorsel = $10, tam_ekran_butonu_gorsel = $11, kucuk_ekran_butonu_gorsel = $12, dogru_tik_gorsel = $13 WHERE id = $14',
-      [ad, aciklama, kategori || null, sinif_seviyesi, durum, toplam_puan || null, gorsel_yolu ?? null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel), id]
+      'UPDATE etkinlikler SET ad = $1, aciklama = $2, kategori = $3, sinif_seviyesi = $4, durum = $5, toplam_puan = $6, toplam_yildiz = $7, gorsel_yolu = $8, ses_ikonu_gorsel = $9, ilerleme_butonu_gorsel = $10, geri_butonu_gorsel = $11, tam_ekran_butonu_gorsel = $12, kucuk_ekran_butonu_gorsel = $13, dogru_tik_gorsel = $14 WHERE id = $15',
+      [ad, aciklama, kategori || null, sinif_seviyesi, durum, toplam_puan || null, toplam_yildiz || null, gorsel_yolu ?? null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel), id]
     );
 
     if (toplam_puan) {
