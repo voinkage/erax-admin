@@ -54,7 +54,6 @@ app.use('/api/kullanicilar', require('./routes/kullanicilar'));
 app.use('/api/kullanici-baglari', require('./routes/kullanici-baglari'));
 app.use('/api/aktivasyon-kodlari', require('./routes/aktivasyon-kodlari'));
 app.use('/api/listeler', require('./routes/listeler'));
-app.use('/api/rozet-ayarlari', require('./routes/rozet-ayarlari'));
 app.use('/api/cdn-medya', require('./routes/cdn-medya'));
 app.use('/api/tema-ayarlari', require('./routes/tema-ayarlari'));
 app.use('/api/upload', require('./routes/upload'));
@@ -93,7 +92,6 @@ app.listen(PORT, () => {
   console.log('   • /api/aktivasyon-kodlari');
   console.log('   • /api/listeler');
   console.log('   • /api/auth (verify)');
-  console.log('   • /api/rozet-ayarlari');
   console.log('   • /api/cdn-medya');
   console.log('   • /api/tema-ayarlari');
   console.log('   • /api/upload (medya kütüphanesi: library, file, folder, ses, gorsel, baloncuk)');
