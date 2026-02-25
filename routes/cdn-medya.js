@@ -1,6 +1,6 @@
 /**
- * CDN Medya – website/kod (genel.txt, logolar, dock-siralamasi), website/fonts için listele, yükle, sil, yeniden adlandır
- * İzin verilen path'ler: website, website/kod, website/kod/logolar, website/kod/dock-siralamasi, website/fonts
+ * CDN Medya – website/* ve marketplace/avatar (diğer CDN formatları gibi tek path)
+ * İzin verilen: website, website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts, website/rozetler, marketplace/avatar
  */
 const express = require('express');
 const multer = require('multer');
@@ -9,11 +9,17 @@ const router = express.Router();
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const fileUploader = require('../utils/fileUploader');
 
-const ALLOWED_PATHS = ['website', 'website/kod', 'website/kod/logolar', 'website/kod/icon', 'website/kod/dock-siralamasi', 'website/fonts', 'website/rozetler', 'erax-storage', 'erax-storage/marketplace', 'erax-storage/marketplace/avatar'];
+const ALLOWED_PATHS = ['website', 'website/kod', 'website/kod/logolar', 'website/kod/icon', 'website/kod/dock-siralamasi', 'website/fonts', 'website/rozetler', 'marketplace', 'marketplace/avatar'];
+
+/** Path'i normalize et: baştaki/sondaki slash, backslash */
+function normalizePath(p) {
+  if (!p || typeof p !== 'string') return '';
+  return p.trim().replace(/^\/+/, '').replace(/\/+$/, '').replace(/\\/g, '/');
+}
 
 function isPathAllowed(targetPath) {
-  if (!targetPath || typeof targetPath !== 'string') return false;
-  const clean = targetPath.replace(/^\/+/, '').replace(/\\/g, '/');
+  const clean = normalizePath(targetPath);
+  if (!clean) return false;
   return ALLOWED_PATHS.some(allowed => clean === allowed || clean.startsWith(allowed + '/'));
 }
 
@@ -25,11 +31,11 @@ const uploadMw = multer({
 });
 
 router.get('/list', authenticateToken, authorizeRoles('admin'), async (req, res) => {
-  const folderPath = (req.query.path || '').trim().replace(/^\/+/, '');
-  if (!isPathAllowed(folderPath)) {
+  const folderPath = normalizePath(req.query.path || '');
+  if (!folderPath || !isPathAllowed(folderPath)) {
     return res.status(400).json({
       success: false,
-      message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts, website/rozetler, erax-storage/marketplace/avatar (ve alt klasörleri)'
+      message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts, website/rozetler, marketplace/avatar (ve alt klasörleri)'
     });
   }
   try {
@@ -51,11 +57,11 @@ router.get('/list', authenticateToken, authorizeRoles('admin'), async (req, res)
 
 router.post('/upload', authenticateToken, authorizeRoles('admin'), uploadMw.single('file'), async (req, res) => {
   try {
-    const folderPath = (req.body.path || req.body.folderPath || '').trim().replace(/^\/+/, '');
+    const folderPath = normalizePath(req.body.path || req.body.folderPath || '');
     if (!isPathAllowed(folderPath)) {
       return res.status(400).json({
         success: false,
-        message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts, website/rozetler, erax-storage/marketplace/avatar (ve alt klasörleri)'
+        message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts, website/rozetler, marketplace/avatar (ve alt klasörleri)'
       });
     }
     if (!req.file || !req.file.buffer) {
@@ -142,7 +148,7 @@ router.post('/purge-cache', authenticateToken, authorizeRoles('admin'), async (r
 
 router.delete('/file', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   try {
-    const filePath = (req.body.path || '').trim().replace(/^\/+/, '');
+    const filePath = normalizePath(req.body.path || '');
     if (!isPathAllowed(filePath)) {
       return res.status(400).json({
         success: false,
@@ -165,7 +171,7 @@ router.delete('/file', authenticateToken, authorizeRoles('admin'), async (req, r
 
 router.put('/rename', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   try {
-    const filePath = (req.body.path || '').trim().replace(/^\/+/, '');
+    const filePath = normalizePath(req.body.path || '');
     const newName = (req.body.newName || '').trim();
     if (!isPathAllowed(filePath)) {
       return res.status(400).json({
@@ -198,7 +204,7 @@ router.put('/rename', authenticateToken, authorizeRoles('admin'), async (req, re
 /** Mevcut path altında yeni klasör oluştur */
 router.post('/folder', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   try {
-    const dirPath = (req.body.path || req.body.dirPath || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
+    const dirPath = normalizePath(req.body.path || req.body.dirPath || '');
     const folderName = (req.body.folderName || req.body.name || '').trim().replace(/[/\\]/g, '');
     if (!dirPath || !folderName) {
       return res.status(400).json({
