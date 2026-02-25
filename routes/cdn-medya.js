@@ -9,7 +9,7 @@ const router = express.Router();
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const fileUploader = require('../utils/fileUploader');
 
-const ALLOWED_PATHS = ['website', 'website/kod', 'website/kod/logolar', 'website/kod/dock-siralamasi', 'website/fonts'];
+const ALLOWED_PATHS = ['website', 'website/kod', 'website/kod/logolar', 'website/kod/icon', 'website/kod/dock-siralamasi', 'website/fonts'];
 
 function isPathAllowed(targetPath) {
   if (!targetPath || typeof targetPath !== 'string') return false;
@@ -29,7 +29,7 @@ router.get('/list', authenticateToken, authorizeRoles('admin'), async (req, res)
   if (!ALLOWED_PATHS.includes(folderPath)) {
     return res.status(400).json({
       success: false,
-      message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/dock-siralamasi, website/fonts'
+      message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts'
     });
   }
   try {
@@ -55,7 +55,7 @@ router.post('/upload', authenticateToken, authorizeRoles('admin'), uploadMw.sing
     if (!ALLOWED_PATHS.includes(folderPath)) {
       return res.status(400).json({
         success: false,
-        message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/dock-siralamasi, website/fonts'
+        message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts'
       });
     }
     if (!req.file || !req.file.buffer) {
