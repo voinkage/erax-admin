@@ -251,7 +251,7 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
       return res.status(400).json({ success: false, message: validation.message });
     }
 
-    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar } = body;
+    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, soru_yildiz, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar } = body;
     const isAsamali = asamali === true || asamali === 'true' || asamali === 1 || asamali === '1';
 
     const { rows: etkinlikler } = await pool.query(
@@ -287,13 +287,14 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
     const soruGorseliVal = (soru_gorseli != null && String(soru_gorseli).trim() !== '') ? String(soru_gorseli).trim() : null;
     const asamaliVal = isAsamali;
 
+    const soruYildizVal = (soru_yildiz != null && Number(soru_yildiz) >= 0) ? Number(soru_yildiz) : null;
     const { rows: soruResultRows } = await pool.query(
       `INSERT INTO etkinlik_sorulari (
         etkinlik_id, soru_numarasi, soru_turu, soru_adi, soru_metni,
-        soru_puan, ses_dosyasi, dogru_cevap_id, ek_bilgi, yonerge, yonerge_ses_dosyasi,
+        soru_puan, soru_yildiz, ses_dosyasi, dogru_cevap_id, ek_bilgi, yonerge, yonerge_ses_dosyasi,
         arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, video_url, soru_gorseli, asamali
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
-      [id, finalSoruNumarasi, soru_turu, soruAdiInsertVal, soruMetniInsertVal, soru_puan || null, ses_dosyasi || null, null, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaPlanYatay, arkaPlanDikey, secenekArkaPlan, videoUrlVal, soruGorseliVal, asamaliVal]
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`,
+      [id, finalSoruNumarasi, soru_turu, soruAdiInsertVal, soruMetniInsertVal, soru_puan || null, soruYildizVal, ses_dosyasi || null, null, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaPlanYatay, arkaPlanDikey, secenekArkaPlan, videoUrlVal, soruGorseliVal, asamaliVal]
     );
     const soruId = soruResultRows[0].id;
 
@@ -441,7 +442,7 @@ router.put('/:id/sorular/siralama', authenticateToken, authorizeRoles('admin', '
 router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
   try {
     const { id, soruId } = req.params;
-    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar } = req.body;
+    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, soru_yildiz, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, arka_plan_gorsel_yatay, arka_plan_gorsel_dikey, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar } = req.body;
 
     const { rows: mevcutSorular } = await pool.query(
       'SELECT soru_turu FROM etkinlik_sorulari WHERE id = $1 AND etkinlik_id = $2',
@@ -511,12 +512,13 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
     const videoUrlVal = (video_url != null && String(video_url).trim() !== '') ? String(video_url).trim() : null;
     const soruGorseliVal = (soru_gorseli != null && String(soru_gorseli).trim() !== '') ? String(soru_gorseli).trim() : null;
     const asamaliVal = asamali === true || asamali === 'true' || asamali === 1 || asamali === '1';
+    const soruYildizVal = (soru_yildiz != null && Number(soru_yildiz) >= 0) ? Number(soru_yildiz) : null;
 
     await pool.query(
-      `UPDATE etkinlik_sorulari SET soru_turu = $1, soru_puan = $2, ses_dosyasi = $3, soru_adi = $4, soru_metni = $5, dogru_cevap_id = NULL, ek_bilgi = $6, yonerge = $7, yonerge_ses_dosyasi = $8, arka_plan_gorsel_yatay = $9, arka_plan_gorsel_dikey = $10, secenek_arka_plan_gorseli = $11, video_url = $12, soru_gorseli = $13, asamali = $14${soru_numarasi != null ? ', soru_numarasi = $15' : ''} WHERE id = ${soru_numarasi != null ? '$16' : '$15'}`,
+      `UPDATE etkinlik_sorulari SET soru_turu = $1, soru_puan = $2, soru_yildiz = $3, ses_dosyasi = $4, soru_adi = $5, soru_metni = $6, dogru_cevap_id = NULL, ek_bilgi = $7, yonerge = $8, yonerge_ses_dosyasi = $9, arka_plan_gorsel_yatay = $10, arka_plan_gorsel_dikey = $11, secenek_arka_plan_gorseli = $12, video_url = $13, soru_gorseli = $14, asamali = $15${soru_numarasi != null ? ', soru_numarasi = $16' : ''} WHERE id = ${soru_numarasi != null ? '$17' : '$16'}`,
       soru_numarasi != null
-        ? [guncelSoruTuru, soru_puan || null, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaPlanYatay, arkaPlanDikey, secenekArkaPlan, videoUrlVal, soruGorseliVal, asamaliVal, soru_numarasi, soruId]
-        : [guncelSoruTuru, soru_puan || null, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaPlanYatay, arkaPlanDikey, secenekArkaPlan, videoUrlVal, soruGorseliVal, asamaliVal, soruId]
+        ? [guncelSoruTuru, soru_puan || null, soruYildizVal, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaPlanYatay, arkaPlanDikey, secenekArkaPlan, videoUrlVal, soruGorseliVal, asamaliVal, soru_numarasi, soruId]
+        : [guncelSoruTuru, soru_puan || null, soruYildizVal, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, arkaPlanYatay, arkaPlanDikey, secenekArkaPlan, videoUrlVal, soruGorseliVal, asamaliVal, soruId]
     );
 
     await pool.query('DELETE FROM etkinlik_soru_asamalari WHERE soru_id = $1', [soruId]);

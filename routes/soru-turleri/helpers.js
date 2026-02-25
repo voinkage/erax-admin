@@ -42,6 +42,7 @@ function normalizeSoruBody(body) {
     soru_gorseli: trimStr(body.soru_gorseli),
     ses_dosyasi: trimStr(body.ses_dosyasi),
     soru_puan: body.soru_puan != null ? body.soru_puan : null,
+    soru_yildiz: body.soru_yildiz != null ? body.soru_yildiz : null,
     ek_bilgi: body.ek_bilgi != null ? body.ek_bilgi : null
   };
 }
