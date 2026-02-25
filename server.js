@@ -1,8 +1,10 @@
 const express = require('express');
 const cors = require('cors');
+const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
+const fileUploader = require('./utils/fileUploader');
 const PORT = process.env.PORT || process.env.DEFAULT_PORT || 3010;
 
 const corsOptions = {
@@ -61,6 +63,30 @@ app.use('/api/upload', require('./routes/upload'));
 app.use('/api/etkinlikler', require('./routes/etkinlikler'));
 // Ünite Sihirbazı (kitaplar + kitap soruları)
 app.use('/api/mufredat/icerikleri', require('./routes/mufredat-icerikleri'));
+
+/** Liderlik tablosu CDN yenileme: cron (00:00) veya POST /api/cron/refresh-leaderboard (X-Internal-Secret: LIDERLIK_EXPORT_SECRET) */
+if (typeof fileUploader.refreshLeaderboardCdn === 'function') {
+  cron.schedule('0 0 * * *', () => {
+    fileUploader.refreshLeaderboardCdn().then((r) => {
+      if (r && r.success) console.log('Liderlik tablosu CDN cron tamamlandı:', r.url);
+      else if (r && !r.success) console.warn('Liderlik tablosu CDN cron:', r.message);
+    }).catch((err) => console.error('Liderlik tablosu CDN cron hatası:', err.message));
+  });
+  console.log('Liderlik tablosu CDN cron: her gün 00:00');
+}
+app.post('/api/cron/refresh-leaderboard', (req, res) => {
+  const secret = process.env.LIDERLIK_EXPORT_SECRET;
+  const sent = req.headers['x-internal-secret'];
+  if (!secret || sent !== secret) {
+    return res.status(401).json({ success: false, message: 'Unauthorized' });
+  }
+  if (typeof fileUploader.refreshLeaderboardCdn !== 'function') {
+    return res.status(503).json({ success: false, message: 'refreshLeaderboardCdn kullanılamıyor (USE_BUNNYCDN?)' });
+  }
+  fileUploader.refreshLeaderboardCdn()
+    .then((r) => res.json(r || { success: false }))
+    .catch((err) => res.status(500).json({ success: false, message: err.message }));
+});
 
 app.get('/health', (req, res) => {
   res.json({

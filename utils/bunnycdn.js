@@ -109,6 +109,9 @@ async function purgeWebsiteCache() {
     }
     const urls = [
         `${base}/website/kod/genel.json`,
+        `${base}/website/kod/font-ayarlari.json`,
+        `${base}/website/kod/liderlik-tablosu.json`,
+        `${base}/website/kod/liderlik-tablosu-ayarlar.json`,
         `${base}/website/kod/dock-siralamasi/kids.json`,
         `${base}/website/kod/dock-siralamasi/junior.json`,
         `${base}/website/kod/dock-siralamasi/teenager.json`,
@@ -125,6 +128,48 @@ async function purgeWebsiteCache() {
     }
     console.log(`Bunny CDN website cache purge tamamlandı: ${purged} başarılı, ${failed} atlandı/hata`);
     return { purged, failed };
+}
+
+/** Liderlik tablosu CDN güncellemesi: kullanici backend export alır, website/kod/liderlik-tablosu.json yükler ve purge eder. */
+const KULLANICI_BACKEND_URL = process.env.KULLANICI_BACKEND_URL || '';
+const LIDERLIK_EXPORT_SECRET = process.env.LIDERLIK_EXPORT_SECRET || '';
+
+async function refreshLeaderboardCdn() {
+    if (!KULLANICI_BACKEND_URL || !LIDERLIK_EXPORT_SECRET) {
+        console.warn('Liderlik CDN yenileme atlandı: KULLANICI_BACKEND_URL veya LIDERLIK_EXPORT_SECRET tanımlı değil.');
+        return { success: false, message: 'Env eksik' };
+    }
+    try {
+        const exportUrl = `${KULLANICI_BACKEND_URL.replace(/\/+$/, '')}/api/leaderboard/export`;
+        const res = await axios.get(exportUrl, {
+            headers: { 'X-Internal-Secret': LIDERLIK_EXPORT_SECRET },
+            timeout: 60000
+        });
+        if (!res.data || !res.data.success) {
+            console.error('Liderlik export yanıtı başarısız:', res.data);
+            return { success: false, message: 'Export yanıtı başarısız' };
+        }
+        const payload = {
+            success: true,
+            ogrenciler: res.data.ogrenciler || [],
+            ogretmenler: res.data.ogretmenler || [],
+            siniflar: res.data.siniflar || [],
+            okullar: res.data.okullar || [],
+            guncelleme: new Date().toISOString()
+        };
+        const remotePath = 'website/kod/liderlik-tablosu.json';
+        const buffer = Buffer.from(JSON.stringify(payload), 'utf8');
+        const publicUrl = await uploadFile(buffer, remotePath);
+        await purgeCache(publicUrl);
+        console.log('Liderlik tablosu CDN güncellendi:', publicUrl);
+        return { success: true, url: publicUrl };
+    } catch (error) {
+        console.error('Liderlik CDN yenileme hatası:', error.message);
+        if (error.response) {
+            console.error('Response:', error.response.status, error.response.data);
+        }
+        return { success: false, message: error.message };
+    }
 }
 
 /**
@@ -818,6 +863,7 @@ module.exports = {
     uploadFile,
     purgeCache,
     purgeWebsiteCache,
+    refreshLeaderboardCdn,
     listFiles,
     deleteFile,
     moveFile,

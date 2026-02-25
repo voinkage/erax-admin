@@ -96,6 +96,26 @@ router.post('/upload', authenticateToken, authorizeRoles('admin'), uploadMw.sing
   }
 });
 
+/** Liderlik tablosu JSON'u anında güncelle (admin panelinden tetiklenir) */
+router.post('/refresh-leaderboard', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+  try {
+    if (typeof fileUploader.refreshLeaderboardCdn !== 'function') {
+      return res.status(503).json({
+        success: false,
+        message: 'Liderlik tablosu güncellemesi bu ortamda kullanılamıyor (USE_BUNNYCDN gerekli)'
+      });
+    }
+    const result = await fileUploader.refreshLeaderboardCdn();
+    return res.json(result || { success: false });
+  } catch (err) {
+    console.error('CDN refresh-leaderboard hatası:', err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'Liderlik tablosu güncellenirken hata oluştu'
+    });
+  }
+});
+
 router.post('/purge-cache', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   try {
     if (typeof fileUploader.purgeWebsiteCache !== 'function') {
