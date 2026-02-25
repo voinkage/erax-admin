@@ -9,7 +9,7 @@ const router = express.Router();
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const fileUploader = require('../utils/fileUploader');
 
-const ALLOWED_PATHS = ['website', 'website/kod', 'website/kod/logolar', 'website/kod/icon', 'website/kod/dock-siralamasi', 'website/fonts'];
+const ALLOWED_PATHS = ['website', 'website/kod', 'website/kod/logolar', 'website/kod/icon', 'website/kod/dock-siralamasi', 'website/fonts', 'website/rozetler'];
 
 function isPathAllowed(targetPath) {
   if (!targetPath || typeof targetPath !== 'string') return false;
@@ -26,10 +26,10 @@ const uploadMw = multer({
 
 router.get('/list', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   const folderPath = (req.query.path || '').trim().replace(/^\/+/, '');
-  if (!ALLOWED_PATHS.includes(folderPath)) {
+  if (!isPathAllowed(folderPath)) {
     return res.status(400).json({
       success: false,
-      message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts'
+      message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts, website/rozetler (ve alt klasörleri)'
     });
   }
   try {
@@ -52,10 +52,10 @@ router.get('/list', authenticateToken, authorizeRoles('admin'), async (req, res)
 router.post('/upload', authenticateToken, authorizeRoles('admin'), uploadMw.single('file'), async (req, res) => {
   try {
     const folderPath = (req.body.path || req.body.folderPath || '').trim().replace(/^\/+/, '');
-    if (!ALLOWED_PATHS.includes(folderPath)) {
+    if (!isPathAllowed(folderPath)) {
       return res.status(400).json({
         success: false,
-        message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts'
+        message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts, website/rozetler (ve alt klasörleri)'
       });
     }
     if (!req.file || !req.file.buffer) {
@@ -171,6 +171,45 @@ router.put('/rename', authenticateToken, authorizeRoles('admin'), async (req, re
     return res.status(500).json({
       success: false,
       message: err.message || 'Yeniden adlandırma başarısız'
+    });
+  }
+});
+
+/** Mevcut path altında yeni klasör oluştur */
+router.post('/folder', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+  try {
+    const dirPath = (req.body.path || req.body.dirPath || '').trim().replace(/^\/+/, '').replace(/\/+$/, '');
+    const folderName = (req.body.folderName || req.body.name || '').trim().replace(/[/\\]/g, '');
+    if (!dirPath || !folderName) {
+      return res.status(400).json({
+        success: false,
+        message: 'path ve folderName gerekli'
+      });
+    }
+    if (!isPathAllowed(dirPath)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bu path için klasör oluşturma izni yok'
+      });
+    }
+    const newFolderPath = dirPath ? `${dirPath}/${folderName}` : folderName;
+    if (!isPathAllowed(newFolderPath)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Oluşturulacak klasör path\'i izin listesine uymalı'
+      });
+    }
+    const created = await fileUploader.createFolder(dirPath, folderName);
+    return res.json({
+      success: !!created,
+      message: created ? 'Klasör oluşturuldu' : 'Klasör oluşturulamadı',
+      data: created ? { path: newFolderPath } : null
+    });
+  } catch (err) {
+    console.error('CDN medya folder hatası:', err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'Klasör oluşturulamadı'
     });
   }
 });

@@ -155,19 +155,25 @@ async function listFiles(targetPath, type = 'all') {
             timeout: 10000
         });
 
-        // Response bir array döndürür
-        const items = Array.isArray(response.data) ? response.data : [];
+        // Response: array veya { items/data/Items } sarmalı olabilir
+        let raw = response.data;
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+            raw = raw.items || raw.data || raw.Items || raw.files || raw.Files || [];
+        }
+        const items = Array.isArray(raw) ? raw : [];
 
         // Klasör ve dosyaları ayır
         const folders = [];
         const files = [];
 
         for (const item of items) {
-            const itemPath = item.ObjectName || item.Name || item;
-            const isDirectory = item.IsDirectory || itemPath.endsWith('/');
+            const rawName = item && (item.ObjectName ?? item.Name ?? item.FileName ?? item.filename ?? item.path);
+            const itemPath = typeof rawName === 'string' ? rawName : (item && item.ObjectName) || (item && item.Name) || '';
+            if (!itemPath) continue;
+            const isDirectory = item.IsDirectory === true || (typeof itemPath === 'string' && itemPath.endsWith('/'));
 
             if (isDirectory) {
-                const folderName = itemPath.replace(/\/$/, '');
+                const folderName = String(itemPath).replace(/\/$/, '');
                 const folderPath = cleanPath ? `${cleanPath}/${folderName}` : folderName;
                 folders.push({
                     name: folderName,
@@ -180,10 +186,13 @@ async function listFiles(targetPath, type = 'all') {
                     (type === 'audio' && isAudioFile(itemPath)) ||
                     (type === 'video' && isVideoFile(itemPath)) ||
                     (type === 'document' && (itemPath.match(/\.(pdf|doc|docx)$/i)))) {
-                    // itemPath sadece dosya adı olabilir, cleanPath ile birleştir
-                    const filePath = cleanPath ? `${cleanPath}/${itemPath}` : itemPath;
+                    // ObjectName bazen sadece dosya adı (1.png), bazen tam yol (website/rozetler/1.png)
+                    const filePath = (itemPath.startsWith(cleanPath + '/') || itemPath.startsWith('/'))
+                        ? itemPath.replace(/^\/+/, '')
+                        : (cleanPath ? `${cleanPath}/${itemPath}` : itemPath);
+                    const fileName = itemPath.includes('/') ? itemPath.split('/').pop() : itemPath;
                     files.push({
-                        name: itemPath,
+                        name: fileName,
                         path: filePath,
                         size: item.Length || item.Size || 0,
                         url: `${BUNNYCDN_PULL_ZONE}/${filePath}`
