@@ -119,7 +119,9 @@ async function purgeWebsiteCache() {
         `${base}/website/kod/logolar/kids.svg`,
         `${base}/website/kod/logolar/junior.svg`,
         `${base}/website/kod/logolar/teenager.svg`,
-        `${base}/website/kod/logolar/admin.svg`
+        `${base}/website/kod/logolar/admin.svg`,
+        `${base}/website/kod/marketplace-avatarlar-ayarlar.json`,
+        `${base}/website/kod/marketplace-avatarlar-frontend.json`
     ];
     let purged = 0, failed = 0;
     for (const url of urls) {

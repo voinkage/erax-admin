@@ -9,7 +9,7 @@ const router = express.Router();
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const fileUploader = require('../utils/fileUploader');
 
-const ALLOWED_PATHS = ['website', 'website/kod', 'website/kod/logolar', 'website/kod/icon', 'website/kod/dock-siralamasi', 'website/fonts', 'website/rozetler'];
+const ALLOWED_PATHS = ['website', 'website/kod', 'website/kod/logolar', 'website/kod/icon', 'website/kod/dock-siralamasi', 'website/fonts', 'website/rozetler', 'erax-storage', 'erax-storage/marketplace', 'erax-storage/marketplace/avatar'];
 
 function isPathAllowed(targetPath) {
   if (!targetPath || typeof targetPath !== 'string') return false;
@@ -29,7 +29,7 @@ router.get('/list', authenticateToken, authorizeRoles('admin'), async (req, res)
   if (!isPathAllowed(folderPath)) {
     return res.status(400).json({
       success: false,
-      message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts, website/rozetler (ve alt klasörleri)'
+      message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts, website/rozetler, erax-storage/marketplace/avatar (ve alt klasörleri)'
     });
   }
   try {
@@ -55,7 +55,7 @@ router.post('/upload', authenticateToken, authorizeRoles('admin'), uploadMw.sing
     if (!isPathAllowed(folderPath)) {
       return res.status(400).json({
         success: false,
-        message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts, website/rozetler (ve alt klasörleri)'
+        message: 'İzin verilen path: website/kod, website/kod/logolar, website/kod/icon, website/kod/dock-siralamasi, website/fonts, website/rozetler, erax-storage/marketplace/avatar (ve alt klasörleri)'
       });
     }
     if (!req.file || !req.file.buffer) {
