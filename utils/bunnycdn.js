@@ -13,6 +13,23 @@ if (!BUNNYCDN_STORAGE_ZONE || !BUNNYCDN_ACCESS_KEY) {
 }
 
 /**
+ * İstek path'i "erax-storage/marketplace/avatar" gibi geldiğinde Bunny API'de zone zaten URL'de
+ * olduğu için path sadece "marketplace/avatar" olmalı (çift prefix önlenir).
+ * @param {string} requestPath - Frontend/cdn-medya'dan gelen path
+ * @returns {string} Bunny Storage API'de kullanılacak path
+ */
+function toStoragePath(requestPath) {
+    if (!requestPath || typeof requestPath !== 'string') return requestPath;
+    const clean = requestPath.replace(/^\/+/, '').replace(/\\/g, '/');
+    const zone = (BUNNYCDN_STORAGE_ZONE || '').toString().trim();
+    if (zone && (clean === zone || clean.startsWith(zone + '/'))) {
+        const without = clean.slice(zone.length).replace(/^\/+/, '');
+        return without || clean;
+    }
+    return clean;
+}
+
+/**
  * Dosyayı BunnyCDN Storage'a yükler
  * @param {Buffer} fileBuffer - Yüklenecek dosyanın buffer'ı
  * @param {string} remoteFilePath - CDN'deki dosya yolu (örn: /uploads/okullar/dosya.jpg)
@@ -24,16 +41,15 @@ async function uploadFile(fileBuffer, remoteFilePath) {
             throw new Error('BUNNYCDN_STORAGE_ZONE veya BUNNYCDN_ACCESS_KEY tanımlı değil');
         }
 
-        // Dosya yolunu temizle ve normalize et
-        const cleanPath = remoteFilePath.replace(/^\/+/, ''); // Başındaki slash'leri kaldır
-        const fileName = path.basename(cleanPath);
-        const directoryPath = path.dirname(cleanPath).replace(/\\/g, '/');
-        
-        // Full path oluştur
-        const fullPath = directoryPath ? `${directoryPath}/${fileName}` : fileName;
+        // İstek path'i (public URL için aynen kullanılır)
+        const requestPath = remoteFilePath.replace(/^\/+/, '').replace(/\\/g, '/');
+        const fileName = path.basename(requestPath);
+        const directoryPath = path.dirname(requestPath).replace(/\\/g, '/');
+        // Bunny API'de kullanılacak path (erax-storage/ öneki kaldırılır)
+        const storagePath = toStoragePath(directoryPath ? `${directoryPath}/${fileName}` : fileName);
 
         // BunnyCDN Storage API URL
-        const uploadUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${fullPath}`;
+        const uploadUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${storagePath}`;
 
         console.log(`BunnyCDN'ye dosya yükleniyor: ${uploadUrl}`);
         console.log(`Dosya boyutu: ${fileBuffer.length} bytes`);
@@ -49,8 +65,8 @@ async function uploadFile(fileBuffer, remoteFilePath) {
             timeout: 60000 // 60 saniye timeout
         });
 
-        // Public URL oluştur
-        const publicUrl = `${BUNNYCDN_PULL_ZONE}/${fullPath}`;
+        // Public URL: frontend'in beklediği path (erax-storage/marketplace/avatar/...)
+        const publicUrl = `${BUNNYCDN_PULL_ZONE}/${requestPath}`;
         console.log(`Dosya başarıyla BunnyCDN'ye yüklendi: ${publicUrl}`);
 
         return publicUrl;
@@ -186,11 +202,13 @@ async function listFiles(targetPath, type = 'all') {
             throw new Error('BUNNYCDN_STORAGE_ZONE veya BUNNYCDN_ACCESS_KEY tanımlı değil');
         }
 
-        // Path'i temizle
-        const cleanPath = targetPath.replace(/^\/+/, '');
+        // İstek path'i (public URL'ler için aynen kullanılır)
+        const requestPath = targetPath.replace(/^\/+/, '');
+        // Bunny API'de kullanılacak path (erax-storage/ öneki kaldırılır)
+        const storagePath = toStoragePath(requestPath);
 
         // BunnyCDN Storage API URL
-        const listUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${cleanPath}/`;
+        const listUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${storagePath}/`;
 
         console.log(`BunnyCDN'den dosya listesi alınıyor: ${listUrl}`);
 
@@ -221,7 +239,7 @@ async function listFiles(targetPath, type = 'all') {
 
             if (isDirectory) {
                 const folderName = String(itemPath).replace(/\/$/, '');
-                const folderPath = cleanPath ? `${cleanPath}/${folderName}` : folderName;
+                const folderPath = requestPath ? `${requestPath}/${folderName}` : folderName;
                 folders.push({
                     name: folderName,
                     path: folderPath
@@ -233,16 +251,15 @@ async function listFiles(targetPath, type = 'all') {
                     (type === 'audio' && isAudioFile(itemPath)) ||
                     (type === 'video' && isVideoFile(itemPath)) ||
                     (type === 'document' && (itemPath.match(/\.(pdf|doc|docx)$/i)))) {
-                    // ObjectName bazen sadece dosya adı (1.png), bazen tam yol (website/rozetler/1.png)
-                    const filePath = (itemPath.startsWith(cleanPath + '/') || itemPath.startsWith('/'))
-                        ? itemPath.replace(/^\/+/, '')
-                        : (cleanPath ? `${cleanPath}/${itemPath}` : itemPath);
+                    // ObjectName bazen sadece dosya adı (1.png), bazen tam yol
                     const fileName = itemPath.includes('/') ? itemPath.split('/').pop() : itemPath;
+                    // Public path: frontend'in beklediği path (erax-storage/marketplace/avatar/...)
+                    const publicFilePath = requestPath ? `${requestPath}/${fileName}` : fileName;
                     files.push({
                         name: fileName,
-                        path: filePath,
+                        path: publicFilePath,
                         size: item.Length || item.Size || 0,
-                        url: `${BUNNYCDN_PULL_ZONE}/${filePath}`
+                        url: `${BUNNYCDN_PULL_ZONE}/${publicFilePath}`
                     });
                 }
             }
@@ -338,11 +355,12 @@ async function deleteFile(filePath) {
             }
         }
 
-        // Path'i temizle
+        // Path'i temizle; Bunny API için erax-storage/ öneki kaldırılır
         const cleanPath = targetPath.replace(/^\/+/, '');
-        
+        const storagePath = toStoragePath(cleanPath);
+
         // BunnyCDN Storage API URL
-        const deleteUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${cleanPath}`;
+        const deleteUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${storagePath}`;
 
         console.log(`[deleteFile] BunnyCDN'den dosya siliniyor: ${deleteUrl}`);
 
@@ -354,7 +372,7 @@ async function deleteFile(filePath) {
             timeout: 10000
         });
 
-        console.log(`[deleteFile] Dosya başarıyla BunnyCDN'den silindi: ${cleanPath}`);
+        console.log(`[deleteFile] Dosya başarıyla BunnyCDN'den silindi: ${storagePath}`);
         return true;
     } catch (error) {
         console.error('[deleteFile] BunnyCDN silme hatası:', error.message);
@@ -383,12 +401,14 @@ async function moveFile(sourcePath, targetPath) {
             throw new Error('BUNNYCDN_STORAGE_ZONE veya BUNNYCDN_ACCESS_KEY tanımlı değil');
         }
 
-        // Path'leri temizle
+        // Path'leri temizle; Bunny API için erax-storage/ öneki kaldırılır
         const cleanSourcePath = sourcePath.replace(/^\/+/, '');
         const cleanTargetPath = targetPath.replace(/^\/+/, '');
+        const storageSourcePath = toStoragePath(cleanSourcePath);
+        const storageTargetPath = toStoragePath(cleanTargetPath);
 
         // Önce dosyayı oku
-        const sourceUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${cleanSourcePath}`;
+        const sourceUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${storageSourcePath}`;
         const response = await axios.get(sourceUrl, {
             headers: {
                 'AccessKey': BUNNYCDN_ACCESS_KEY
@@ -398,7 +418,7 @@ async function moveFile(sourcePath, targetPath) {
         });
 
         // Dosyayı hedefe yükle
-        const targetUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${cleanTargetPath}`;
+        const targetUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${storageTargetPath}`;
         const fileName = path.basename(cleanTargetPath);
         
         await axios.put(targetUrl, response.data, {
@@ -434,13 +454,13 @@ async function createFolder(dirPath, folderName) {
             throw new Error('BUNNYCDN_STORAGE_ZONE veya BUNNYCDN_ACCESS_KEY tanımlı değil');
         }
 
-        // Path'i temizle
+        // Path'i temizle; Bunny API için erax-storage/ öneki kaldırılır
         const cleanDirPath = dirPath.replace(/^\/+/, '').replace(/\/+$/, '');
         const newFolderPath = cleanDirPath ? `${cleanDirPath}/${folderName}` : folderName;
-        
+        const storageFolderPath = toStoragePath(newFolderPath);
+
         // BunnyCDN'de klasörler otomatik oluşur, ancak bir dummy dosya oluşturarak klasörün varlığını garanti ederiz
-        // Klasör path'ini "/" ile bitirerek bir "dummy" dosya oluşturuyoruz
-        const folderAsFileUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${newFolderPath}/.keep`;
+        const folderAsFileUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${storageFolderPath}/.keep`;
         
         // Boş bir dosya oluştur (klasörün varlığını garanti eder)
         await axios.put(folderAsFileUrl, Buffer.from(''), {
@@ -565,7 +585,8 @@ async function deleteFolder(folderPath) {
         
         // 2. Klasörü direkt silmeyi dene (BunnyCDN boş klasörleri de silebilir)
         try {
-            const folderDeleteUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${cleanPath}/`;
+            const storagePath = toStoragePath(cleanPath);
+            const folderDeleteUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${storagePath}/`;
             console.log(`[deleteFolder] Klasör direkt siliniyor: ${folderDeleteUrl}`);
             await axios.delete(folderDeleteUrl, {
                 headers: {
@@ -793,9 +814,10 @@ async function renameFolder(folderPath, newName) {
         if (files.files?.length === 0 && files.folders?.length === 0) {
             console.log(`[renameFolder] Boş klasör yeniden adlandırılıyor, yeni .keep dosyası oluşturuluyor`);
             try {
-                // Yeni klasör için .keep dosyası oluştur
+                // Yeni klasör için .keep dosyası oluştur (Bunny API path için normalize)
                 const newKeepFile = `${newPath}/.keep`;
-                const keepFileUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${newKeepFile}`;
+                const storageKeepPath = toStoragePath(newKeepFile);
+                const keepFileUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${storageKeepPath}`;
                 await axios.put(keepFileUrl, Buffer.from(''), {
                     headers: {
                         'AccessKey': BUNNYCDN_ACCESS_KEY,
@@ -822,7 +844,8 @@ async function renameFolder(folderPath, newName) {
                 // Boş klasörü direkt sil
                 console.log(`[renameFolder] Kaynak klasör boş, direkt siliniyor: ${cleanPath}`);
                 try {
-                    const folderDeleteUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${cleanPath}/`;
+                    const storagePath = toStoragePath(cleanPath);
+                    const folderDeleteUrl = `https://storage.bunnycdn.com/${BUNNYCDN_STORAGE_ZONE}/${storagePath}/`;
                     await axios.delete(folderDeleteUrl, {
                         headers: {
                             'AccessKey': BUNNYCDN_ACCESS_KEY
