@@ -35,8 +35,6 @@ function normalizeSoruBody(body) {
     soru_metni: trimStr(body.soru_metni),
     yonerge: trimStr(body.yonerge),
     yonerge_ses_dosyasi: trimStr(body.yonerge_ses_dosyasi),
-    arka_plan_gorsel_yatay: trimStr(body.arka_plan_gorsel_yatay),
-    arka_plan_gorsel_dikey: trimStr(body.arka_plan_gorsel_dikey),
     secenek_arka_plan_gorseli: trimStr(body.secenek_arka_plan_gorseli),
     video_url: trimStr(body.video_url),
     soru_gorseli: trimStr(body.soru_gorseli),

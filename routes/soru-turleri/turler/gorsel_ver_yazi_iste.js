@@ -1,9 +1,9 @@
 /**
  * Soru türü: gorsel_ver_yazi_iste
- * Zorunlu: arka_plan_gorsel_yatay (her zaman).
+ * Zorunlu: soru_gorseli (her zaman).
  */
 function validate(body) {
-  if (!body.arka_plan_gorsel_yatay || !String(body.arka_plan_gorsel_yatay).trim()) {
+  if (!body.soru_gorseli || !String(body.soru_gorseli).trim()) {
     return { ok: false, message: 'Görsel ver Yazı iste için görsel gereklidir' };
   }
   return { ok: true };

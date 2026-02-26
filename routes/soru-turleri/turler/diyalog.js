@@ -1,11 +1,11 @@
 /**
  * Soru türü: diyalog
- * Zorunlu: arka_plan_gorsel_yatay (aşamalı değilse).
+ * Zorunlu: soru_gorseli (aşamalı değilse).
  */
 function validate(body, opts) {
   const { isAsamali } = opts || {};
   if (isAsamali) return { ok: true };
-  if (!body.arka_plan_gorsel_yatay || !String(body.arka_plan_gorsel_yatay).trim()) {
+  if (!body.soru_gorseli || !String(body.soru_gorseli).trim()) {
     return { ok: false, message: 'Diyalog için görsel gereklidir' };
   }
   return { ok: true };
