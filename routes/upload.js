@@ -32,10 +32,18 @@ const uploadAny = multer({
   limits: { fileSize: 10 * 1024 * 1024 }
 });
 
+/** Güvenli dosya adı: path/.. kaldırılır, boşsa 'file' kullanılır */
+function sanitizeFilename(originalname) {
+  const base = path.basename(originalname || '').replace(/\.\./g, '').trim();
+  if (!base) return 'file';
+  const ext = path.extname(base);
+  const name = path.basename(base, ext) || 'file';
+  return (name.slice(0, 200) + ext).replace(/[<>:"|?*\x00-\x1f]/g, '_');
+}
+
+/** Orijinal dosya adını kullanır (aynı isimle yükleme aynı klasörde üzerine yazar) */
 function makeFilename(originalname) {
-  const ext = path.extname(originalname);
-  const name = path.basename(originalname, ext);
-  return `${Date.now()}-${Math.round(Math.random() * 1E9)}-${name}${ext}`;
+  return sanitizeFilename(originalname);
 }
 
 router.post('/ses/:etkinlikAdi', authenticateToken, authorizeRoles('admin', 'ogretmen'), uploadSes.single('ses'), async (req, res) => {

@@ -100,10 +100,10 @@ router.get('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) 
 router.post('/upload/gorsel', authenticateToken, authorizeRoles('admin'), uploadGorsel.single('gorsel'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'Dosya yüklenemedi' });
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const ext = path.extname(req.file.originalname);
-    const name = path.basename(req.file.originalname, ext);
-    const filename = `${uniqueSuffix}-${name}${ext}`;
+    const base = path.basename(req.file.originalname || '').replace(/\.\./g, '').trim();
+    const ext = path.extname(base);
+    const name = (path.basename(base, ext) || 'file').slice(0, 200);
+    const filename = (name + ext).replace(/[<>:"|?*\x00-\x1f]/g, '_') || 'file' + ext;
     const remoteFilePath = `/uploads/okullar/${filename}`;
     const publicUrl = await fileUploader.uploadFile(req.file.buffer, remoteFilePath);
     res.json({ success: true, message: 'Görsel başarıyla yüklendi', data: { path: remoteFilePath, url: publicUrl, filename, originalname: req.file.originalname, size: req.file.size } });
@@ -135,10 +135,10 @@ router.post('/upload/file', authenticateToken, authorizeRoles('admin'), uploadAn
       const customName = customFilename.trim();
       filename = customName.endsWith(ext) ? customName : customName + ext;
     } else {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      const ext = path.extname(req.file.originalname);
-      const name = path.basename(req.file.originalname, ext);
-      filename = `${uniqueSuffix}-${name}${ext}`;
+      const base = path.basename(req.file.originalname || '').replace(/\.\./g, '').trim();
+      const ext = path.extname(base);
+      const name = (path.basename(base, ext) || 'file').slice(0, 200);
+      filename = (name + ext).replace(/[<>:"|?*\x00-\x1f]/g, '_') || 'file' + ext;
     }
     const remoteFilePath = `${targetPath}/${filename}`;
     const publicUrl = await fileUploader.uploadFile(req.file.buffer, remoteFilePath);
