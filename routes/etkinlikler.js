@@ -9,6 +9,13 @@ const { icerikPool: pool, organizasyonPool, seviyePool } = require('../config/da
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const { validateSoruEkle, validateSoruGuncelle } = require('./soru-turleri');
 
+/** Sayı alanı: undefined, null, '', NaN -> null; geçerli sayı -> number (0 dahil) */
+function numOrNull (v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 // Admin: etkinlik listesi (sadece admin; öğrenci/öğretmen listesi eradil-etkinlik'ten)
 router.get('/', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   try {
@@ -50,7 +57,7 @@ router.post('/', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (
     const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
     const result = await pool.query(
       `INSERT INTO etkinlikler (ad, aciklama, kategori, sinif_seviyesi, olusturan_id, olusturan_rol, durum, tur, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
-      [ad, aciklama || null, kategori || null, sinif_seviyesi, req.user.id, userRol, durum || 'aktif', null, toplam_puan || null, toplam_yildiz || null, gorsel_yolu || null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel)]
+      [ad, aciklama || null, kategori || null, sinif_seviyesi, req.user.id, userRol, durum || 'aktif', null, numOrNull(toplam_puan), numOrNull(toplam_yildiz), gorsel_yolu || null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel)]
     );
 
     res.status(201).json({
@@ -89,12 +96,14 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
 
     const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
+    const normPuan = numOrNull(toplam_puan);
+    const normYildiz = numOrNull(toplam_yildiz);
     await pool.query(
       'UPDATE etkinlikler SET ad = $1, aciklama = $2, kategori = $3, sinif_seviyesi = $4, durum = $5, toplam_puan = $6, toplam_yildiz = $7, gorsel_yolu = $8, ses_ikonu_gorsel = $9, ilerleme_butonu_gorsel = $10, geri_butonu_gorsel = $11, tam_ekran_butonu_gorsel = $12, kucuk_ekran_butonu_gorsel = $13, dogru_tik_gorsel = $14 WHERE id = $15',
-      [ad, aciklama, kategori || null, sinif_seviyesi, durum, toplam_puan || null, toplam_yildiz || null, gorsel_yolu ?? null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel), id]
+      [ad ?? null, aciklama ?? null, kategori || null, sinif_seviyesi ?? null, durum ?? 'aktif', normPuan, normYildiz, gorsel_yolu ?? null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel), id]
     );
 
-    if (toplam_puan) {
+    if (normPuan != null && normPuan > 0) {
       await dagitPuanlari(id);
     }
 
