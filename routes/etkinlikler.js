@@ -97,25 +97,6 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
     const normPuan = numOrNull(toplam_puan);
     const normYildiz = numOrNull(toplam_yildiz);
-    const { rows: countRows } = await pool.query(
-      'SELECT COUNT(*)::int AS n FROM etkinlik_sorulari WHERE etkinlik_id = $1',
-      [id]
-    );
-    const soruSayisi = countRows[0]?.n ?? 0;
-    if (soruSayisi > 0) {
-      if (normPuan != null && normPuan > 0 && normPuan % soruSayisi !== 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Toplam puan, soru sayısına (${soruSayisi}) tam bölünebilir olmalı (örn. ${soruSayisi}, ${soruSayisi * 2}, ${soruSayisi * 3}...).`
-        });
-      }
-      if (normYildiz != null && normYildiz > 0 && normYildiz % soruSayisi !== 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Toplam yıldız, soru sayısına (${soruSayisi}) tam bölünebilir olmalı (örn. ${soruSayisi}, ${soruSayisi * 2}, ${soruSayisi * 3}...).`
-        });
-      }
-    }
 
     const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
     await pool.query(
@@ -259,16 +240,22 @@ router.get('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) 
     if (N > 0) {
       const toplamPuan = etkinlikData.toplam_puan;
       const toplamYildiz = etkinlikData.toplam_yildiz;
-      if (toplamPuan != null && toplamPuan > 0 && toplamPuan % N === 0) {
-        const puanPerSoru = Math.floor(toplamPuan / N);
-        for (const soru of sorular) {
-          if (soru.soru_puan == null || soru.soru_puan === 0) soru.soru_puan = puanPerSoru;
+      if (toplamPuan != null && toplamPuan > 0) {
+        const basePuan = Math.floor(toplamPuan / N);
+        const modPuan = toplamPuan % N;
+        for (let i = 0; i < sorular.length; i++) {
+          if (sorular[i].soru_puan == null || sorular[i].soru_puan === 0) {
+            sorular[i].soru_puan = basePuan + (i < modPuan ? 1 : 0);
+          }
         }
       }
-      if (toplamYildiz != null && toplamYildiz > 0 && toplamYildiz % N === 0) {
-        const yildizPerSoru = Math.floor(toplamYildiz / N);
-        for (const soru of sorular) {
-          if (soru.soru_yildiz == null || soru.soru_yildiz === 0) soru.soru_yildiz = yildizPerSoru;
+      if (toplamYildiz != null && toplamYildiz > 0) {
+        const baseYildiz = Math.floor(toplamYildiz / N);
+        const modYildiz = toplamYildiz % N;
+        for (let i = 0; i < sorular.length; i++) {
+          if (sorular[i].soru_yildiz == null || sorular[i].soru_yildiz === 0) {
+            sorular[i].soru_yildiz = baseYildiz + (i < modYildiz ? 1 : 0);
+          }
         }
       }
     }
@@ -682,7 +669,7 @@ async function syncEtkinlikDurum(etkinlikId) {
   }
 }
 
-/** Toplam puanı, puanı yazılmamış sorulara eşit böler (toplam_puan % soruSayisi === 0 olmalı). */
+/** Toplam puanı sorulara en yakın şekilde dağıtır (tam bölünmese bile: kalan ilk sorulara +1). */
 async function dagitPuanlari(etkinlikId) {
   try {
     const { rows: etkinlikler } = await pool.query(
@@ -693,26 +680,27 @@ async function dagitPuanlari(etkinlikId) {
 
     const toplamPuan = etkinlikler[0].toplam_puan;
     const { rows: sorular } = await pool.query(
-      'SELECT id, soru_puan FROM etkinlik_sorulari WHERE etkinlik_id = $1 ORDER BY soru_numarasi',
+      'SELECT id FROM etkinlik_sorulari WHERE etkinlik_id = $1 ORDER BY soru_numarasi',
       [etkinlikId]
     );
-    if (sorular.length === 0 || toplamPuan % sorular.length !== 0) return;
+    if (sorular.length === 0) return;
 
-    const puanPerSoru = Math.floor(toplamPuan / sorular.length);
-    for (const soru of sorular) {
-      if (soru.soru_puan == null || soru.soru_puan === 0) {
-        await pool.query(
-          'UPDATE etkinlik_sorulari SET soru_puan = $1 WHERE id = $2',
-          [puanPerSoru, soru.id]
-        );
-      }
+    const N = sorular.length;
+    const base = Math.floor(toplamPuan / N);
+    const remainder = toplamPuan % N;
+    for (let i = 0; i < sorular.length; i++) {
+      const puan = base + (i < remainder ? 1 : 0);
+      await pool.query(
+        'UPDATE etkinlik_sorulari SET soru_puan = $1 WHERE id = $2',
+        [puan, sorular[i].id]
+      );
     }
   } catch (error) {
     console.error('Puan dağıtım hatası:', error);
   }
 }
 
-/** Toplam yıldızı, yıldızı yazılmamış sorulara eşit böler (toplam_yildiz % soruSayisi === 0 olmalı). */
+/** Toplam yıldızı sorulara en yakın şekilde dağıtır (tam bölünmese bile). */
 async function dagitYildizlari(etkinlikId) {
   try {
     const { rows: etkinlikler } = await pool.query(
@@ -723,19 +711,20 @@ async function dagitYildizlari(etkinlikId) {
 
     const toplamYildiz = etkinlikler[0].toplam_yildiz;
     const { rows: sorular } = await pool.query(
-      'SELECT id, soru_yildiz FROM etkinlik_sorulari WHERE etkinlik_id = $1 ORDER BY soru_numarasi',
+      'SELECT id FROM etkinlik_sorulari WHERE etkinlik_id = $1 ORDER BY soru_numarasi',
       [etkinlikId]
     );
-    if (sorular.length === 0 || toplamYildiz % sorular.length !== 0) return;
+    if (sorular.length === 0) return;
 
-    const yildizPerSoru = Math.floor(toplamYildiz / sorular.length);
-    for (const soru of sorular) {
-      if (soru.soru_yildiz == null || soru.soru_yildiz === 0) {
-        await pool.query(
-          'UPDATE etkinlik_sorulari SET soru_yildiz = $1 WHERE id = $2',
-          [yildizPerSoru, soru.id]
-        );
-      }
+    const N = sorular.length;
+    const base = Math.floor(toplamYildiz / N);
+    const remainder = toplamYildiz % N;
+    for (let i = 0; i < sorular.length; i++) {
+      const yildiz = base + (i < remainder ? 1 : 0);
+      await pool.query(
+        'UPDATE etkinlik_sorulari SET soru_yildiz = $1 WHERE id = $2',
+        [yildiz, sorular[i].id]
+      );
     }
   } catch (error) {
     console.error('Yıldız dağıtım hatası:', error);

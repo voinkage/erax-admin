@@ -117,16 +117,22 @@ router.get('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) 
     if (N > 0) {
       const toplamPuan = kitapData.toplam_puan;
       const toplamYildiz = kitapData.toplam_yildiz;
-      if (toplamPuan != null && toplamPuan > 0 && toplamPuan % N === 0) {
-        const puanPerSoru = Math.floor(toplamPuan / N);
-        for (const soru of sorular) {
-          if (soru.soru_puan == null || soru.soru_puan === 0) soru.soru_puan = puanPerSoru;
+      if (toplamPuan != null && toplamPuan > 0) {
+        const basePuan = Math.floor(toplamPuan / N);
+        const modPuan = toplamPuan % N;
+        for (let i = 0; i < sorular.length; i++) {
+          if (sorular[i].soru_puan == null || sorular[i].soru_puan === 0) {
+            sorular[i].soru_puan = basePuan + (i < modPuan ? 1 : 0);
+          }
         }
       }
-      if (toplamYildiz != null && toplamYildiz > 0 && toplamYildiz % N === 0) {
-        const yildizPerSoru = Math.floor(toplamYildiz / N);
-        for (const soru of sorular) {
-          if (soru.soru_yildiz == null || soru.soru_yildiz === 0) soru.soru_yildiz = yildizPerSoru;
+      if (toplamYildiz != null && toplamYildiz > 0) {
+        const baseYildiz = Math.floor(toplamYildiz / N);
+        const modYildiz = toplamYildiz % N;
+        for (let i = 0; i < sorular.length; i++) {
+          if (sorular[i].soru_yildiz == null || sorular[i].soru_yildiz === 0) {
+            sorular[i].soru_yildiz = baseYildiz + (i < modYildiz ? 1 : 0);
+          }
         }
       }
     }
@@ -173,22 +179,6 @@ router.put('/:id', authenticateToken, authorizeRoles('admin', 'ogretmen'), async
       [id]
     );
     const soruSayisi = countRows[0]?.n ?? 0;
-    if (soruSayisi > 0) {
-      const np = numOrNull(body.toplam_puan);
-      const ny = numOrNull(body.toplam_yildiz);
-      if (np != null && np > 0 && np % soruSayisi !== 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Toplam puan, soru sayısına (${soruSayisi}) tam bölünebilir olmalı (örn. ${soruSayisi}, ${soruSayisi * 2}, ${soruSayisi * 3}...).`
-        });
-      }
-      if (ny != null && ny > 0 && ny % soruSayisi !== 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Toplam yıldız, soru sayısına (${soruSayisi}) tam bölünebilir olmalı (örn. ${soruSayisi}, ${soruSayisi * 2}, ${soruSayisi * 3}...).`
-        });
-      }
-    }
 
     const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
     await pool.query(
@@ -197,12 +187,33 @@ router.put('/:id', authenticateToken, authorizeRoles('admin', 'ogretmen'), async
     );
     if (soruSayisi > 0) {
       const np = numOrNull(body.toplam_puan);
-      if (np != null && np > 0 && np % soruSayisi === 0) {
-        const puanPerSoru = Math.floor(np / soruSayisi);
-        await pool.query(
-          'UPDATE kitap_sorulari SET soru_puan = $1 WHERE kitap_id = $2 AND (soru_puan IS NULL OR soru_puan = 0)',
-          [puanPerSoru, id]
+      if (np != null && np > 0) {
+        const { rows: kitapSorular } = await pool.query(
+          'SELECT id FROM kitap_sorulari WHERE kitap_id = $1 ORDER BY soru_numarasi',
+          [id]
         );
+        const basePuan = Math.floor(np / kitapSorular.length);
+        const modPuan = np % kitapSorular.length;
+        for (let i = 0; i < kitapSorular.length; i++) {
+          const puan = basePuan + (i < modPuan ? 1 : 0);
+          await pool.query('UPDATE kitap_sorulari SET soru_puan = $1 WHERE id = $2', [puan, kitapSorular[i].id]);
+        }
+      }
+      const ny = numOrNull(body.toplam_yildiz);
+      if (ny != null && ny > 0) {
+        const { rows: kitapSorularY } = await pool.query(
+          'SELECT id FROM kitap_sorulari WHERE kitap_id = $1 ORDER BY soru_numarasi',
+          [id]
+        );
+        const baseYildiz = Math.floor(ny / kitapSorularY.length);
+        const modYildiz = ny % kitapSorularY.length;
+        for (let i = 0; i < kitapSorularY.length; i++) {
+          const yildiz = baseYildiz + (i < modYildiz ? 1 : 0);
+          await pool.query(
+            'UPDATE kitap_sorulari SET soru_yildiz = $1 WHERE id = $2',
+            [yildiz, kitapSorularY[i].id]
+          ).catch(() => {});
+        }
       }
     }
     return res.json({ success: true, message: 'Kitap güncellendi' });
