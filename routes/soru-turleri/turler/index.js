@@ -8,6 +8,7 @@ const gorsel_ver_yazi_iste = require('./gorsel_ver_yazi_iste');
 const dogru_ses_dogru_gorsel = require('./dogru_ses_dogru_gorsel');
 const gorsele_uygun_kelime = require('./gorsele_uygun_kelime');
 const dogru_resme_tikla = require('./dogru_resme_tikla');
+const bak_ve_dogru_sirala = require('./bak_ve_dogru_sirala');
 const varsayilan = require('./varsayilan');
 
 /** Seçenek zorunlu olmayan türler (kendi validasyonları var veya seçenek opsiyonel) */
@@ -17,7 +18,8 @@ const SECENEK_ZORUNLU_DEGIL = new Set([
   'gorsel_ver_yazi_iste',
   'dogru_ses_dogru_gorsel',
   'gorsele_uygun_kelime',
-  'dogru_resme_tikla'
+  'dogru_resme_tikla',
+  'bak_ve_dogru_sirala'
 ]);
 
 const turModulleri = {
@@ -28,6 +30,7 @@ const turModulleri = {
   dogru_ses_dogru_gorsel,
   gorsele_uygun_kelime,
   dogru_resme_tikla,
+  bak_ve_dogru_sirala,
   renk_ses_eslestir: varsayilan,
   gruplama: varsayilan,
   swap_puzzle: varsayilan,

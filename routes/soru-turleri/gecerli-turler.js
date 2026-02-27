@@ -6,6 +6,7 @@ const GECERLI_TURLER = [
   'dinle_sec',
   'gorsele_uygun_kelime',
   'dogru_resme_tikla',
+  'bak_ve_dogru_sirala',
   'renk_ses_eslestir',
   'dogru_ses_dogru_gorsel',
   'gruplama',
