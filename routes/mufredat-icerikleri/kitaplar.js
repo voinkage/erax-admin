@@ -40,14 +40,14 @@ router.get('/', authenticateToken, authorizeRoles('admin'), async (req, res) => 
 router.post('/', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
   try {
     if (!pool) return res.status(503).json({ success: false, message: 'Kitaplar servisi yapılandırılmamış' });
-    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
+    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel } = req.body;
     const userRol = req.user.rol || req.user.role;
     if (!ad) return res.status(400).json({ success: false, message: 'Kitap adı gereklidir' });
     const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
     const { rows } = await pool.query(
-      `INSERT INTO kitaplar (ad, aciklama, kategori, sinif_seviyesi, olusturan_id, olusturan_rol, durum, tur, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
-      [ad, aciklama || null, kategori || null, sinif_seviyesi || null, req.user.id, userRol, durum || 'aktif', null, numOrNull(toplam_puan), numOrNull(toplam_yildiz), gorsel_yolu || null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel)]
+      `INSERT INTO kitaplar (ad, aciklama, kategori, sinif_seviyesi, olusturan_id, olusturan_rol, durum, tur, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
+      [ad, aciklama || null, kategori || null, sinif_seviyesi || null, req.user.id, userRol, durum || 'aktif', null, numOrNull(toplam_puan), numOrNull(toplam_yildiz), gorsel_yolu || null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel)]
     );
     return res.status(201).json({ success: true, message: 'Kitap oluşturuldu', data: { id: rows[0].id } });
   } catch (error) {
@@ -127,21 +127,39 @@ router.get('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) 
 router.put('/:id', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
   try {
     if (!pool) return res.status(503).json({ success: false, message: 'Kitaplar servisi yapılandırılmamış' });
-    const { id } = req.params;
-    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
+    const idRaw = req.params.id;
+    const id = idRaw != null && /^\d+$/.test(String(idRaw)) ? parseInt(idRaw, 10) : NaN;
+    if (Number.isNaN(id) || id < 1) return res.status(400).json({ success: false, message: 'Geçersiz kitap id' });
+    const body = req.body || {};
+    const ad = body.ad != null ? String(body.ad).trim() : null;
+    const aciklama = body.aciklama != null ? String(body.aciklama).trim() : null;
+    const kategori = body.kategori != null ? String(body.kategori).trim() : null;
+    const sinif_seviyesi = numOrNull(body.sinif_seviyesi);
+    const durum = body.durum != null && String(body.durum).trim() !== '' ? String(body.durum).trim() : 'aktif';
+    const toplam_puan = numOrNull(body.toplam_puan);
+    const toplam_yildiz = numOrNull(body.toplam_yildiz);
+    const gorsel_yolu = body.gorsel_yolu != null && String(body.gorsel_yolu).trim() !== '' ? String(body.gorsel_yolu).trim() : null;
+    const ses_ikonu_gorsel = body.ses_ikonu_gorsel;
+    const ilerleme_butonu_gorsel = body.ilerleme_butonu_gorsel;
+    const geri_butonu_gorsel = body.geri_butonu_gorsel;
+    const tam_ekran_butonu_gorsel = body.tam_ekran_butonu_gorsel;
+    const kucuk_ekran_butonu_gorsel = body.kucuk_ekran_butonu_gorsel;
+
+    if (!ad) return res.status(400).json({ success: false, message: 'Kitap adı gereklidir' });
 
     const { rows } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
     if (rows.length === 0) return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
 
     const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
     await pool.query(
-      `UPDATE kitaplar SET ad = $1, aciklama = $2, kategori = $3, sinif_seviyesi = $4, durum = $5, toplam_puan = $6, toplam_yildiz = $7, gorsel_yolu = $8, ses_ikonu_gorsel = $9, ilerleme_butonu_gorsel = $10, geri_butonu_gorsel = $11, tam_ekran_butonu_gorsel = $12, kucuk_ekran_butonu_gorsel = $13, dogru_tik_gorsel = $14 WHERE id = $15`,
-      [ad ?? null, aciklama || null, kategori || null, sinif_seviyesi ?? null, durum ?? 'aktif', numOrNull(toplam_puan), numOrNull(toplam_yildiz), gorsel_yolu ?? null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel), id]
+      `UPDATE kitaplar SET ad = $1, aciklama = $2, kategori = $3, sinif_seviyesi = $4, durum = $5, toplam_puan = $6, toplam_yildiz = $7, gorsel_yolu = $8, ses_ikonu_gorsel = $9, ilerleme_butonu_gorsel = $10, geri_butonu_gorsel = $11, tam_ekran_butonu_gorsel = $12, kucuk_ekran_butonu_gorsel = $13 WHERE id = $14`,
+      [ad, aciklama || null, kategori || null, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, gorsel_yolu, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), id]
     );
     return res.json({ success: true, message: 'Kitap güncellendi' });
   } catch (error) {
     console.error('Kitap güncelleme hatası:', error);
-    return res.status(500).json({ success: false, message: 'Kitap güncellenirken hata oluştu' });
+    const errMsg = error.message || 'Kitap güncellenirken hata oluştu';
+    return res.status(500).json({ success: false, message: 'Kitap güncellenirken hata oluştu', error: errMsg });
   }
 });
 
