@@ -6,6 +6,7 @@ const video_dinleme = require('./video_dinleme');
 const diyalog = require('./diyalog');
 const gorsel_ver_yazi_iste = require('./gorsel_ver_yazi_iste');
 const dogru_ses_dogru_gorsel = require('./dogru_ses_dogru_gorsel');
+const gorsele_uygun_kelime = require('./gorsele_uygun_kelime');
 const varsayilan = require('./varsayilan');
 
 /** Seçenek zorunlu olmayan türler (kendi validasyonları var veya seçenek opsiyonel) */
@@ -13,7 +14,8 @@ const SECENEK_ZORUNLU_DEGIL = new Set([
   'video_dinleme',
   'diyalog',
   'gorsel_ver_yazi_iste',
-  'dogru_ses_dogru_gorsel'
+  'dogru_ses_dogru_gorsel',
+  'gorsele_uygun_kelime'
 ]);
 
 const turModulleri = {
@@ -22,6 +24,7 @@ const turModulleri = {
   diyalog,
   gorsel_ver_yazi_iste,
   dogru_ses_dogru_gorsel,
+  gorsele_uygun_kelime,
   renk_ses_eslestir: varsayilan,
   gruplama: varsayilan,
   swap_puzzle: varsayilan,
