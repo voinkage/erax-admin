@@ -138,7 +138,8 @@ async function purgeWebsiteCache() {
         `${base}/website/kod/logolar/admin.svg`,
         `${base}/website/kod/marketplace-avatarlar-ayarlar.json`,
         `${base}/website/kod/marketplace-avatarlar-frontend.json`,
-        `${base}/website/kod/etkinlik-unite-ikon-gorselleri.json`
+        `${base}/website/kod/etkinlik-unite-ikon-gorselleri.json`,
+        `${base}/website/kod/ikonlar-ayarlar.json`
     ];
     let purged = 0, failed = 0;
     for (const url of urls) {
