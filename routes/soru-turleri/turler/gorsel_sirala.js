@@ -9,7 +9,7 @@ function validate(body, opts) {
 
   function validateSeceneklerVeSira(secenekler, dogru_sira) {
     if (!Array.isArray(secenekler) || secenekler.length < 2) return false;
-    const hasGorsel = secenekler.every((s) => s && (s.gorsel && String(s.gorsel).trim()));
+    const hasGorsel = secenekler.every((s) => s && ((s.gorsel && String(s.gorsel).trim()) || (s.secenek_gorseli && String(s.secenek_gorseli).trim())));
     if (!hasGorsel) return false;
     const n = secenekler.length;
     if (!Array.isArray(dogru_sira) || dogru_sira.length !== n) return false;
