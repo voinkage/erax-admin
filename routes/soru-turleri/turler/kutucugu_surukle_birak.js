@@ -10,7 +10,10 @@ function validate(body, opts) {
   function validateKutucuklar(kutucuklar) {
     if (!Array.isArray(kutucuklar) || kutucuklar.length < 1) return false
     const dogruSayisi = kutucuklar.filter((k) => k.dogru_cevap === true || k.dogru_cevap === 1 || k.dogru_cevap === '1').length
-    return dogruSayisi === 1 && kutucuklar.every((k) => k.gorsel && String(k.gorsel).trim())
+    const hasMetinOrGorsel = (k) =>
+      (k.metin != null && String(k.metin).trim() !== '') ||
+      (k.gorsel != null && String(k.gorsel).trim() !== '')
+    return dogruSayisi === 1 && kutucuklar.every(hasMetinOrGorsel)
   }
 
   function validateHedef(hedef) {
@@ -48,7 +51,7 @@ function validate(body, opts) {
   }
   const kutucuklar = body.kutucuklar || body.ek_bilgi?.kutucuklar
   if (!validateKutucuklar(kutucuklar)) {
-    return { ok: false, message: 'En az bir kutucuk ekleyin ve tam birini doğru cevap olarak işaretleyin. Her kutucuğun görseli olmalıdır.' }
+    return { ok: false, message: 'En az bir kutucuk ekleyin ve tam birini doğru cevap olarak işaretleyin. Her kutucukta yazı veya görsel (en az biri) olmalıdır.' }
   }
   return { ok: true }
 }
