@@ -344,7 +344,7 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
     const secenekListesi = secenekler && Array.isArray(secenekler) ? secenekler : [];
     for (const secenek of secenekListesi) {
       const secenekMetni = (secenek.secenek_metni && secenek.secenek_metni.trim().length > 0) ? secenek.secenek_metni.trim() : null;
-      const secenekGorseli = (secenek.secenek_gorseli && secenek.secenek_gorseli.trim().length > 0) ? secenek.secenek_gorseli.trim() : null;
+      const secenekGorseli = (secenek.secenek_gorseli && secenek.secenek_gorseli.trim().length > 0) ? secenek.secenek_gorseli.trim() : (secenek.gorsel && String(secenek.gorsel).trim().length > 0 ? String(secenek.gorsel).trim() : null);
       const secenekSesDosyasi = (secenek.secenek_ses_dosyasi && secenek.secenek_ses_dosyasi.trim().length > 0) ? secenek.secenek_ses_dosyasi.trim() : null;
       const secenekRengi = (secenek.secenek_rengi && secenek.secenek_rengi.trim().length > 0) ? secenek.secenek_rengi.trim() : null;
       const kategori = secenek.kategori || null;
@@ -521,7 +521,7 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
       if (eskiSoru.ses_dosyasi && eskiSoru.ses_dosyasi !== ses_dosyasi) {
         await fileUploader.deleteFile(eskiSoru.ses_dosyasi);
       }
-      const yeniGorseller = (secenekler || []).map(s => s.secenek_gorseli).filter(Boolean);
+      const yeniGorseller = (secenekler || []).map(s => (s.secenek_gorseli && String(s.secenek_gorseli).trim()) || (s.gorsel && String(s.gorsel).trim()) || null).filter(Boolean);
       for (const eskiSecenek of eskiSecenekler) {
         if (eskiSecenek.secenek_gorseli && !yeniGorseller.includes(eskiSecenek.secenek_gorseli)) {
           await fileUploader.deleteFile(eskiSecenek.secenek_gorseli);
@@ -566,7 +566,8 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
     const secenekListesiGuncelleme = (secenekler && Array.isArray(secenekler)) ? secenekler : [];
     for (const secenek of secenekListesiGuncelleme) {
       const secenekMetni = (secenek.secenek_metni && secenek.secenek_metni.trim().length > 0) ? secenek.secenek_metni.trim() : null;
-      const secenekGorseli = (secenek.secenek_gorseli && secenek.secenek_gorseli.trim().length > 0) ? secenek.secenek_gorseli.trim() : null;
+      const gorselDeger = (secenek.secenek_gorseli && secenek.secenek_gorseli.trim().length > 0) ? secenek.secenek_gorseli.trim() : (secenek.gorsel && String(secenek.gorsel).trim().length > 0 ? String(secenek.gorsel).trim() : null);
+      const secenekGorseli = gorselDeger;
       const secenekSesDosyasi = (secenek.secenek_ses_dosyasi && secenek.secenek_ses_dosyasi.trim().length > 0) ? secenek.secenek_ses_dosyasi.trim() : null;
       const secenekRengi = (secenek.secenek_rengi && secenek.secenek_rengi.trim().length > 0) ? secenek.secenek_rengi.trim() : null;
       const kategori = secenek.kategori || null;
