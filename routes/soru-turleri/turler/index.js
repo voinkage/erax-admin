@@ -5,6 +5,7 @@ const dinle_sec = require('./dinle_sec');
 const video_dinleme = require('./video_dinleme');
 const diyalog = require('./diyalog');
 const gorsel_ver_yazi_iste = require('./gorsel_ver_yazi_iste');
+const surpriz_kelime = require('./surpriz_kelime');
 const dogru_ses_dogru_gorsel = require('./dogru_ses_dogru_gorsel');
 const gorsele_uygun_kelime = require('./gorsele_uygun_kelime');
 const gorsele_gore_bosluk_doldur = require('./gorsele_gore_bosluk_doldur');
@@ -27,7 +28,8 @@ const SECENEK_ZORUNLU_DEGIL = new Set([
   'bak_ve_dogru_sirala',
   'kutucugu_surukle_birak',
   'gorsel_sirala',
-  'bak_ve_kutucuk_sec'
+  'bak_ve_kutucuk_sec',
+  'surpriz_kelime'
 ]);
 
 const turModulleri = {
@@ -35,6 +37,7 @@ const turModulleri = {
   video_dinleme,
   diyalog,
   gorsel_ver_yazi_iste,
+  surpriz_kelime,
   dogru_ses_dogru_gorsel,
   gorsele_uygun_kelime,
   gorsele_gore_bosluk_doldur,

@@ -21,7 +21,8 @@ const GECERLI_TURLER = [
   'eksik_harf_tamamlama',
   'video_dinleme',
   'diyalog',
-  'gorsel_ver_yazi_iste'
+  'gorsel_ver_yazi_iste',
+  'surpriz_kelime'
 ];
 
 function gecerliMi(tur) {
