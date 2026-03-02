@@ -325,8 +325,8 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
       `INSERT INTO etkinlik_sorulari (
         etkinlik_id, soru_numarasi, soru_turu, soru_adi, soru_metni,
         soru_puan, soru_yildiz, ses_dosyasi, dogru_cevap_id, ek_bilgi, yonerge, yonerge_ses_dosyasi,
-        secenek_arka_plan_gorseli, video_url, soru_gorseli, asamali
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
+        secenek_arka_plan_gorseli, video_url, soru_gorseli, asamali, aktif
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, false) RETURNING id`,
       [id, finalSoruNumarasi, soru_turu, soruAdiInsertVal, soruMetniInsertVal, soru_puan || null, soruYildizVal, ses_dosyasi || null, null, ek_bilgi || null, yonergeVal, yonergeSesVal, secenekArkaPlan, videoUrlVal, soruGorseliVal, asamaliVal]
     );
     const soruId = soruResultRows[0].id;
@@ -550,12 +550,17 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
     const soruGorseliVal = (soru_gorseli != null && String(soru_gorseli).trim() !== '') ? String(soru_gorseli).trim() : null;
     const asamaliVal = asamali === true || asamali === 'true' || asamali === 1 || asamali === '1';
     const soruYildizVal = (soru_yildiz != null && Number(soru_yildiz) >= 0) ? Number(soru_yildiz) : null;
+    const aktifVal = req.body.aktif === true || req.body.aktif === 'true' || req.body.aktif === 1 ? true : (req.body.aktif === false || req.body.aktif === 'false' || req.body.aktif === 0 ? false : null);
 
+    const setAktif = aktifVal !== null ? ', aktif = $' + (soru_numarasi != null ? '15' : '14') : '';
+    const whereIdNum = soru_numarasi != null ? (aktifVal !== null ? 16 : 15) : (aktifVal !== null ? 15 : 14);
+    const baseParams = soru_numarasi != null
+      ? [guncelSoruTuru, soru_puan || null, soruYildizVal, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, secenekArkaPlan, videoUrlVal, soruGorseliVal, asamaliVal, soru_numarasi, soruId]
+      : [guncelSoruTuru, soru_puan || null, soruYildizVal, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, secenekArkaPlan, videoUrlVal, soruGorseliVal, asamaliVal, soruId];
+    const updateParams = aktifVal !== null ? baseParams.concat([aktifVal]) : baseParams;
     await pool.query(
-      `UPDATE etkinlik_sorulari SET soru_turu = $1, soru_puan = $2, soru_yildiz = $3, ses_dosyasi = $4, soru_adi = $5, soru_metni = $6, dogru_cevap_id = NULL, ek_bilgi = $7, yonerge = $8, yonerge_ses_dosyasi = $9, secenek_arka_plan_gorseli = $10, video_url = $11, soru_gorseli = $12, asamali = $13${soru_numarasi != null ? ', soru_numarasi = $14' : ''} WHERE id = ${soru_numarasi != null ? '$15' : '$14'}`,
-      soru_numarasi != null
-        ? [guncelSoruTuru, soru_puan || null, soruYildizVal, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, secenekArkaPlan, videoUrlVal, soruGorseliVal, asamaliVal, soru_numarasi, soruId]
-        : [guncelSoruTuru, soru_puan || null, soruYildizVal, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, secenekArkaPlan, videoUrlVal, soruGorseliVal, asamaliVal, soruId]
+      `UPDATE etkinlik_sorulari SET soru_turu = $1, soru_puan = $2, soru_yildiz = $3, ses_dosyasi = $4, soru_adi = $5, soru_metni = $6, dogru_cevap_id = NULL, ek_bilgi = $7, yonerge = $8, yonerge_ses_dosyasi = $9, secenek_arka_plan_gorseli = $10, video_url = $11, soru_gorseli = $12, asamali = $13${soru_numarasi != null ? ', soru_numarasi = $14' : ''}${setAktif} WHERE id = $${whereIdNum}`,
+      updateParams
     );
 
     await pool.query('DELETE FROM etkinlik_soru_asamalari WHERE soru_id = $1', [soruId]);
@@ -607,6 +612,32 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
       success: false,
       message: 'Soru güncellenirken bir hata oluştu'
     });
+  }
+});
+
+// Soru aktif/pasif (sadece bu alanı günceller; liste üzerinden tek tıkla değiştirme için)
+router.put('/:id/sorular/:soruId(\\d+)/aktif', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
+  try {
+    const { id, soruId } = req.params;
+    const aktif = req.body.aktif === true || req.body.aktif === 'true' || req.body.aktif === 1;
+    const { rows: etkinlikler } = await pool.query(
+      'SELECT olusturan_id FROM etkinlikler WHERE id = $1',
+      [id]
+    );
+    if (etkinlikler.length === 0) return res.status(404).json({ success: false, message: 'Etkinlik bulunamadı' });
+    const userRol = req.user.rol || req.user.role;
+    if (userRol !== 'admin' && etkinlikler[0].olusturan_id !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Yetkiniz yok' });
+    }
+    const updateResult = await pool.query(
+      'UPDATE etkinlik_sorulari SET aktif = $1 WHERE id = $2 AND etkinlik_id = $3',
+      [aktif, soruId, id]
+    );
+    if (updateResult.rowCount === 0) return res.status(404).json({ success: false, message: 'Soru bulunamadı' });
+    res.json({ success: true, message: aktif ? 'Soru aktif edildi' : 'Soru pasife alındı', data: { aktif } });
+  } catch (error) {
+    console.error('Soru aktif güncelleme hatası:', error);
+    res.status(500).json({ success: false, message: 'Güncellenirken hata oluştu' });
   }
 });
 
