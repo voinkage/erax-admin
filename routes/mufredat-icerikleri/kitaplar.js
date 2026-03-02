@@ -40,14 +40,15 @@ router.get('/', authenticateToken, authorizeRoles('admin'), async (req, res) => 
 router.post('/', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
   try {
     if (!pool) return res.status(503).json({ success: false, message: 'Kitaplar servisi yapılandırılmamış' });
-    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel } = req.body;
+    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, puan_ekleme_modu, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel } = req.body;
     const userRol = req.user.rol || req.user.role;
     if (!ad) return res.status(400).json({ success: false, message: 'Kitap adı gereklidir' });
+    const puanEklemeModuInsert = (puan_ekleme_modu === 'her_soruda' || puan_ekleme_modu === 'sonunda') ? puan_ekleme_modu : 'sonunda';
     const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
     const { rows } = await pool.query(
-      `INSERT INTO kitaplar (ad, aciklama, kategori, sinif_seviyesi, olusturan_id, olusturan_rol, durum, tur, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING id`,
-      [ad, aciklama || null, kategori || null, sinif_seviyesi || null, req.user.id, userRol, durum || 'aktif', null, numOrNull(toplam_puan), numOrNull(toplam_yildiz), gorsel_yolu || null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel)]
+      `INSERT INTO kitaplar (ad, aciklama, kategori, sinif_seviyesi, olusturan_id, olusturan_rol, durum, tur, toplam_puan, toplam_yildiz, puan_ekleme_modu, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
+      [ad, aciklama || null, kategori || null, sinif_seviyesi || null, req.user.id, userRol, durum || 'aktif', null, numOrNull(toplam_puan), numOrNull(toplam_yildiz), puanEklemeModuInsert, gorsel_yolu || null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel)]
     );
     return res.status(201).json({ success: true, message: 'Kitap oluşturuldu', data: { id: rows[0].id } });
   } catch (error) {
@@ -162,6 +163,9 @@ router.put('/:id', authenticateToken, authorizeRoles('admin', 'ogretmen'), async
     const durum = body.durum != null && String(body.durum).trim() !== '' ? String(body.durum).trim() : 'aktif';
     const toplam_puan = numOrNull(body.toplam_puan);
     const toplam_yildiz = numOrNull(body.toplam_yildiz);
+    const puanEklemeModu = (body.puan_ekleme_modu === 'her_soruda' || body.puan_ekleme_modu === 'sonunda')
+      ? body.puan_ekleme_modu
+      : 'sonunda';
     const gorsel_yolu = body.gorsel_yolu != null && String(body.gorsel_yolu).trim() !== '' ? String(body.gorsel_yolu).trim() : null;
     const ses_ikonu_gorsel = body.ses_ikonu_gorsel;
     const ilerleme_butonu_gorsel = body.ilerleme_butonu_gorsel;
@@ -182,8 +186,8 @@ router.put('/:id', authenticateToken, authorizeRoles('admin', 'ogretmen'), async
 
     const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
     await pool.query(
-      `UPDATE kitaplar SET ad = $1, aciklama = $2, kategori = $3, sinif_seviyesi = $4, durum = $5, toplam_puan = $6, toplam_yildiz = $7, gorsel_yolu = $8, ses_ikonu_gorsel = $9, ilerleme_butonu_gorsel = $10, geri_butonu_gorsel = $11, tam_ekran_butonu_gorsel = $12, kucuk_ekran_butonu_gorsel = $13 WHERE id = $14`,
-      [ad, aciklama || null, kategori || null, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, gorsel_yolu, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), id]
+      `UPDATE kitaplar SET ad = $1, aciklama = $2, kategori = $3, sinif_seviyesi = $4, durum = $5, toplam_puan = $6, toplam_yildiz = $7, puan_ekleme_modu = $8, gorsel_yolu = $9, ses_ikonu_gorsel = $10, ilerleme_butonu_gorsel = $11, geri_butonu_gorsel = $12, tam_ekran_butonu_gorsel = $13, kucuk_ekran_butonu_gorsel = $14 WHERE id = $15`,
+      [ad, aciklama || null, kategori || null, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, puanEklemeModu, gorsel_yolu, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), id]
     );
     if (soruSayisi > 0) {
       const np = numOrNull(body.toplam_puan);

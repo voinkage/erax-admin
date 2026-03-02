@@ -44,7 +44,8 @@ router.get('/', authenticateToken, authorizeRoles('admin'), async (req, res) => 
 // Etkinlik ekle
 router.post('/', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (req, res) => {
   try {
-    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
+    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, puan_ekleme_modu, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
+    const puanEklemeModuInsert = (puan_ekleme_modu === 'her_soruda' || puan_ekleme_modu === 'sonunda') ? puan_ekleme_modu : 'sonunda';
 
     if (!ad) {
       return res.status(400).json({ success: false, message: 'Etkinlik adı gereklidir' });
@@ -56,8 +57,8 @@ router.post('/', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (
     const userRol = req.user.rol || req.user.role;
     const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
     const result = await pool.query(
-      `INSERT INTO etkinlikler (ad, aciklama, kategori, sinif_seviyesi, olusturan_id, olusturan_rol, durum, tur, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING id`,
-      [ad, aciklama || null, kategori || null, sinif_seviyesi, req.user.id, userRol, durum || 'aktif', null, numOrNull(toplam_puan), numOrNull(toplam_yildiz), gorsel_yolu || null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel)]
+      `INSERT INTO etkinlikler (ad, aciklama, kategori, sinif_seviyesi, olusturan_id, olusturan_rol, durum, tur, toplam_puan, toplam_yildiz, puan_ekleme_modu, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18) RETURNING id`,
+      [ad, aciklama || null, kategori || null, sinif_seviyesi, req.user.id, userRol, durum || 'aktif', null, numOrNull(toplam_puan), numOrNull(toplam_yildiz), puanEklemeModuInsert, gorsel_yolu || null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel)]
     );
 
     res.status(201).json({
@@ -78,7 +79,8 @@ router.post('/', authenticateToken, authorizeRoles('admin', 'ogretmen'), async (
 router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
+    const { ad, aciklama, kategori, sinif_seviyesi, durum, toplam_puan, toplam_yildiz, puan_ekleme_modu, gorsel_yolu, ses_ikonu_gorsel, ilerleme_butonu_gorsel, geri_butonu_gorsel, tam_ekran_butonu_gorsel, kucuk_ekran_butonu_gorsel, dogru_tik_gorsel } = req.body;
+    const puanEklemeModu = (puan_ekleme_modu === 'her_soruda' || puan_ekleme_modu === 'sonunda') ? puan_ekleme_modu : 'sonunda';
 
     const { rows: etkinlikler } = await pool.query(
       'SELECT olusturan_id, olusturan_rol FROM etkinlikler WHERE id = $1',
@@ -100,8 +102,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
     const iconVal = (v) => (v != null && String(v).trim() !== '') ? String(v).trim() : null;
     await pool.query(
-      'UPDATE etkinlikler SET ad = $1, aciklama = $2, kategori = $3, sinif_seviyesi = $4, durum = $5, toplam_puan = $6, toplam_yildiz = $7, gorsel_yolu = $8, ses_ikonu_gorsel = $9, ilerleme_butonu_gorsel = $10, geri_butonu_gorsel = $11, tam_ekran_butonu_gorsel = $12, kucuk_ekran_butonu_gorsel = $13, dogru_tik_gorsel = $14 WHERE id = $15',
-      [ad ?? null, aciklama ?? null, kategori || null, sinif_seviyesi ?? null, durum ?? 'aktif', normPuan, normYildiz, gorsel_yolu ?? null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel), id]
+      'UPDATE etkinlikler SET ad = $1, aciklama = $2, kategori = $3, sinif_seviyesi = $4, durum = $5, toplam_puan = $6, toplam_yildiz = $7, puan_ekleme_modu = $8, gorsel_yolu = $9, ses_ikonu_gorsel = $10, ilerleme_butonu_gorsel = $11, geri_butonu_gorsel = $12, tam_ekran_butonu_gorsel = $13, kucuk_ekran_butonu_gorsel = $14, dogru_tik_gorsel = $15 WHERE id = $16',
+      [ad ?? null, aciklama ?? null, kategori || null, sinif_seviyesi ?? null, durum ?? 'aktif', normPuan, normYildiz, puanEklemeModu, gorsel_yolu ?? null, iconVal(ses_ikonu_gorsel), iconVal(ilerleme_butonu_gorsel), iconVal(geri_butonu_gorsel), iconVal(tam_ekran_butonu_gorsel), iconVal(kucuk_ekran_butonu_gorsel), iconVal(dogru_tik_gorsel), id]
     );
 
     if (normPuan != null && normPuan > 0) await dagitPuanlari(id);
