@@ -8,6 +8,7 @@ const path = require('path');
 const router = express.Router();
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const fileUploader = require('../utils/fileUploader');
+const ozelMedyaPaths = require('../utils/ozelMedyaPaths');
 
 const ALLOWED_PATHS = ['website', 'website/kod', 'website/kod/logolar', 'website/kod/icon', 'website/kod/dock-siralamasi', 'website/fonts', 'website/rozetler', 'marketplace', 'marketplace/avatar'];
 
@@ -39,8 +40,8 @@ router.get('/list', authenticateToken, authorizeRoles('admin'), async (req, res)
     });
   }
   try {
-    const data = await fileUploader.listFiles(folderPath, 'all');
-    const result = data && typeof data === 'object' ? data : { folders: [], files: [] };
+    let data = await fileUploader.listFiles(folderPath, 'all');
+    const result = ozelMedyaPaths.markOzelInResult(data && typeof data === 'object' ? data : { folders: [], files: [] });
     return res.json({ success: true, data: result });
   } catch (err) {
     if (folderPath === 'website/fonts') {
@@ -74,6 +75,8 @@ router.post('/upload', authenticateToken, authorizeRoles('admin'), uploadMw.sing
     const safeName = path.basename(filename).replace(/[^\w.\u00C0-\u024F\u0400-\u04FF-]/gi, '_') || 'file';
     const remotePath = `${folderPath}/${safeName}`;
     const publicUrl = await fileUploader.uploadFile(req.file.buffer, remotePath);
+    const ozel = req.body.ozel === true || req.body.ozel === 'true';
+    if (ozel) ozelMedyaPaths.addPath(remotePath);
     if (folderPath === 'website' || folderPath.startsWith('website/')) {
       if (typeof fileUploader.purgeCache === 'function') {
         fileUploader.purgeCache(publicUrl).catch(() => {});
@@ -91,7 +94,7 @@ router.post('/upload', authenticateToken, authorizeRoles('admin'), uploadMw.sing
     return res.json({
       success: true,
       message: 'Dosya yüklendi',
-      data: { url: publicUrl, path: remotePath, name: safeName }
+      data: { url: publicUrl, path: remotePath, name: safeName, ozel: !!ozel }
     });
   } catch (err) {
     console.error('CDN medya upload hatası:', err);
@@ -155,6 +158,16 @@ router.delete('/file', authenticateToken, authorizeRoles('admin'), async (req, r
         message: 'Bu path için silme izni yok'
       });
     }
+    if (ozelMedyaPaths.hasPath(filePath)) {
+      const key = req.body.ozel_islem_key != null ? String(req.body.ozel_islem_key).trim() : '';
+      if (key !== process.env.OZEL_ISLEM_KEY) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bu dosya özel (kilitli). Silmek için geçerli özel işlem anahtarını girmelisiniz.'
+        });
+      }
+      ozelMedyaPaths.removePath(filePath);
+    }
     const ok = await fileUploader.deleteFile(filePath);
     return res.json({
       success: !!ok,
@@ -185,8 +198,20 @@ router.put('/rename', authenticateToken, authorizeRoles('admin'), async (req, re
         message: 'newName gerekli'
       });
     }
+    if (ozelMedyaPaths.hasPath(filePath)) {
+      const key = req.body.ozel_islem_key != null ? String(req.body.ozel_islem_key).trim() : '';
+      if (key !== process.env.OZEL_ISLEM_KEY) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bu dosya özel (kilitli). Yeniden adlandırmak için geçerli özel işlem anahtarını girmelisiniz.'
+        });
+      }
+    }
     const safeName = path.basename(newName).replace(/[^\w.\u00C0-\u024F\u0400-\u04FF-]/gi, '_') || newName;
     const newPath = await fileUploader.renameFile(filePath, safeName);
+    if (newPath && ozelMedyaPaths.hasPath(filePath)) {
+      ozelMedyaPaths.replacePath(filePath, newPath);
+    }
     return res.json({
       success: !!newPath,
       message: newPath ? 'Yeniden adlandırıldı' : 'Yeniden adlandırılamadı',

@@ -9,6 +9,7 @@ const router = express.Router();
 const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const fileUploader = require('../utils/fileUploader');
 const { updateFileReferences, updateFolderReferences } = require('../utils/updateFileReferencesEtkinlik');
+const ozelMedyaPaths = require('../utils/ozelMedyaPaths');
 
 const memoryStorage = multer.memoryStorage();
 const sesFilter = (req, file, cb) => {
@@ -102,9 +103,11 @@ router.post('/file', authenticateToken, authorizeRoles('admin', 'ogretmen'), upl
     if (!req.file) return res.status(400).json({ success: false, message: 'Dosya yüklenemedi' });
     const targetPath = (req.body.path || '/uploads/etkinlikler').trim();
     const type = (req.body.type || 'all').trim();
+    const ozel = req.body.ozel === true || req.body.ozel === 'true';
     const filename = makeFilename(req.file.originalname);
     const remoteFilePath = `${targetPath}/${filename}`;
     const publicUrl = await fileUploader.uploadFile(req.file.buffer, remoteFilePath);
+    if (ozel) ozelMedyaPaths.addPath(remoteFilePath);
     const isImage = req.file.mimetype.startsWith('image/');
     const isAudio = req.file.mimetype.startsWith('audio/');
     res.json({
@@ -116,7 +119,8 @@ router.post('/file', authenticateToken, authorizeRoles('admin', 'ogretmen'), upl
         filename,
         originalname: req.file.originalname,
         size: req.file.size,
-        type: isImage ? 'image' : isAudio ? 'audio' : 'other'
+        type: isImage ? 'image' : isAudio ? 'audio' : 'other',
+        ozel: !!ozel
       }
     });
   } catch (error) {
@@ -129,6 +133,16 @@ router.delete('/file', authenticateToken, authorizeRoles('admin', 'ogretmen'), a
   try {
     const filePath = req.body.path;
     if (!filePath) return res.status(400).json({ success: false, message: 'Dosya yolu gereklidir' });
+    if (ozelMedyaPaths.hasPath(filePath)) {
+      const key = req.body.ozel_islem_key != null ? String(req.body.ozel_islem_key).trim() : '';
+      if (key !== process.env.OZEL_ISLEM_KEY) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bu dosya özel (kilitli). Silmek için geçerli özel işlem anahtarını girmelisiniz.'
+        });
+      }
+      ozelMedyaPaths.removePath(filePath);
+    }
     const deleted = await fileUploader.deleteFile(filePath);
     res.json({ success: !!deleted, message: deleted ? 'Dosya başarıyla silindi' : 'Dosya silinemedi' });
   } catch (error) {
@@ -158,7 +172,19 @@ router.post('/rename', authenticateToken, authorizeRoles('admin', 'ogretmen'), a
   try {
     const { path: filePath, newName } = req.body;
     if (!filePath || !newName) return res.status(400).json({ success: false, message: 'Dosya yolu ve yeni ad gereklidir' });
+    if (ozelMedyaPaths.hasPath(filePath)) {
+      const key = req.body.ozel_islem_key != null ? String(req.body.ozel_islem_key).trim() : '';
+      if (key !== process.env.OZEL_ISLEM_KEY) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bu dosya özel (kilitli). Yeniden adlandırmak için geçerli özel işlem anahtarını girmelisiniz.'
+        });
+      }
+    }
     const renamed = await fileUploader.renameFile(filePath, newName);
+    if (renamed && ozelMedyaPaths.hasPath(filePath)) {
+      ozelMedyaPaths.replacePath(filePath, renamed);
+    }
     res.json(renamed
       ? { success: true, message: 'Dosya yeniden adlandırıldı', data: { newPath: renamed } }
       : { success: false, message: 'Dosya yeniden adlandırılamadı' });
@@ -227,8 +253,9 @@ router.get('/library', authenticateToken, authorizeRoles('admin', 'ogretmen'), a
   try {
     const targetPath = (req.query.path || '/uploads/etkinlikler').trim();
     const type = (req.query.type || 'all').trim();
-    const result = await fileUploader.listFiles(targetPath, type);
-    res.json({ success: true, data: result || { folders: [], files: [] } });
+    let result = await fileUploader.listFiles(targetPath, type);
+    result = ozelMedyaPaths.markOzelInResult(result || { folders: [], files: [] });
+    res.json({ success: true, data: result });
   } catch (error) {
     console.error('Dosya listesi hatası:', error);
     res.status(500).json({ success: false, message: error.message || 'Dosya listesi alınamadı' });

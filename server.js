@@ -57,6 +57,7 @@ app.use('/api/kullanici-baglari', require('./routes/kullanici-baglari'));
 app.use('/api/aktivasyon-kodlari', require('./routes/aktivasyon-kodlari'));
 app.use('/api/listeler', require('./routes/listeler'));
 app.use('/api/cdn-medya', require('./routes/cdn-medya'));
+app.use('/api/ozel-islemler', require('./routes/ozel-islemler'));
 app.use('/api/tema-ayarlari', require('./routes/tema-ayarlari'));
 app.use('/api/upload', require('./routes/upload'));
 // Etkinlik Sihirbazı (etkinlikler + sorular CRUD)

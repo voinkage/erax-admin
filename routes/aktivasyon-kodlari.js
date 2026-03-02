@@ -79,6 +79,108 @@ router.post('/', authenticateToken, authorizeRoles('admin'), async (req, res) =>
   }
 });
 
+/** Toplu aktivasyon kodu oluşturma (Excel vb. için). Body: { items: [ { rol, okul_id, sinif_id?, lisans_suresi_baslangic, lisans_suresi_bitis, tanimli_ad_soyad?, tanimli_kullanici_adi?, tc_kimlik_no? } ] } */
+const MAX_BULK_ITEMS = 500;
+router.post('/bulk', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+  try {
+    const { items } = req.body || {};
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, message: 'items dizisi boş olmamalıdır' });
+    }
+    if (items.length > MAX_BULK_ITEMS) {
+      return res.status(400).json({ success: false, message: `En fazla ${MAX_BULK_ITEMS} kod oluşturabilirsiniz` });
+    }
+    if (!organizasyonPool) {
+      return res.status(500).json({ success: false, message: 'ORGANIZASYON_DB_URL environment variable eksik!' });
+    }
+    const created = [];
+    const errors = [];
+    for (let i = 0; i < items.length; i++) {
+      const row = items[i];
+      const { rol, okul_id, sinif_id, lisans_suresi_baslangic, lisans_suresi_bitis, tanimli_ad_soyad, tanimli_kullanici_adi, tc_kimlik_no } = row;
+      try {
+        if (!rol || !['ogretmen', 'ogrenci'].includes(rol)) {
+          errors.push({ row: i + 1, message: 'Geçerli rol (ogretmen/ogrenci) gerekli' });
+          continue;
+        }
+        if (!okul_id) {
+          errors.push({ row: i + 1, message: 'Okul seçilmelidir' });
+          continue;
+        }
+        if (!lisans_suresi_baslangic || !lisans_suresi_bitis) {
+          errors.push({ row: i + 1, message: 'Lisans başlangıç ve bitiş tarihleri gerekli' });
+          continue;
+        }
+        if (new Date(lisans_suresi_baslangic) > new Date(lisans_suresi_bitis)) {
+          errors.push({ row: i + 1, message: 'Bitiş tarihi başlangıçtan sonra olmalı' });
+          continue;
+        }
+        let finalSinifId = null;
+        if (rol === 'ogrenci') {
+          if (!sinif_id) {
+            errors.push({ row: i + 1, message: 'Öğrenci için sınıf seçilmelidir' });
+            continue;
+          }
+          finalSinifId = sinif_id;
+        }
+        const { rows: okullar } = await organizasyonPool.query('SELECT id FROM okullar WHERE id = $1 AND durum = $2', [okul_id, 'aktif']);
+        if (okullar.length === 0) {
+          errors.push({ row: i + 1, message: 'Okul bulunamadı veya aktif değil' });
+          continue;
+        }
+        if (rol === 'ogrenci' && finalSinifId) {
+          const { rows: siniflar } = await organizasyonPool.query(
+            'SELECT id FROM siniflar WHERE id = $1 AND okul_id = $2 AND durum = $3',
+            [finalSinifId, okul_id, 'aktif']
+          );
+          if (siniflar.length === 0) {
+            errors.push({ row: i + 1, message: 'Sınıf bu okula ait değil veya aktif değil' });
+            continue;
+          }
+        }
+        let kod; let isUnique = false; let attempts = 0;
+        while (!isUnique && attempts < 10) {
+          kod = crypto.randomBytes(8).toString('hex').toUpperCase().trim();
+          const { rows: existing } = await pool.query('SELECT id FROM aktivasyon_kodlari WHERE UPPER(TRIM(kod)) = $1', [kod]);
+          if (existing.length === 0) isUnique = true; else attempts++;
+        }
+        if (!isUnique) {
+          errors.push({ row: i + 1, message: 'Benzersiz kod oluşturulamadı' });
+          continue;
+        }
+        const tanimliAdSoyadVal = (tanimli_ad_soyad != null && String(tanimli_ad_soyad).trim() !== '') ? String(tanimli_ad_soyad).trim() : null;
+        const tanimliKullaniciAdiVal = (tanimli_kullanici_adi != null && String(tanimli_kullanici_adi).trim() !== '') ? String(tanimli_kullanici_adi).trim() : null;
+        const tcKimlikVal = (tc_kimlik_no != null && String(tc_kimlik_no).trim() !== '') ? String(tc_kimlik_no).trim() : null;
+        const { rows: result } = await pool.query(
+          'INSERT INTO aktivasyon_kodlari (kod, rol, okul_id, sinif_id, sinif_ids, tc_kimlik_no, lisans_suresi_baslangic, lisans_suresi_bitis, olusturan_id, tanimli_ad_soyad, tanimli_kullanici_adi) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id',
+          [kod, rol, okul_id, finalSinifId, null, tcKimlikVal, lisans_suresi_baslangic, lisans_suresi_bitis, req.user.id, tanimliAdSoyadVal, tanimliKullaniciAdiVal]
+        );
+        created.push({
+          id: result[0].id,
+          kod,
+          rol,
+          okul_id,
+          sinif_id: finalSinifId || null,
+          tanimli_ad_soyad: tanimliAdSoyadVal,
+          tanimli_kullanici_adi: tanimliKullaniciAdiVal,
+          tc_kimlik_no: tcKimlikVal
+        });
+      } catch (err) {
+        console.error('Bulk kod satır hatası:', err);
+        errors.push({ row: i + 1, message: err.message || 'Kayıt oluşturulamadı' });
+      }
+    }
+    res.status(201).json({
+      success: true,
+      message: `${created.length} kod oluşturuldu${errors.length ? `, ${errors.length} satır hatalı` : ''}`,
+      data: { created, errors: errors.length ? errors : undefined }
+    });
+  } catch (error) {
+    console.error('Toplu aktivasyon kodu oluşturma hatası:', error);
+    res.status(500).json({ success: false, message: 'Toplu kod oluşturulurken bir hata oluştu' });
+  }
+});
+
 router.get('/', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   try {
     const { kullanildi, rol } = req.query;
