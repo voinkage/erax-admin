@@ -371,6 +371,12 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
     );
 
     await syncEtkinlikDurum(id);
+    // Toplu dağıtım: yeni soru eklendikten sonra puan/yıldızı tüm sorulara yeniden dağıt
+    const { rows: etkRow } = await pool.query('SELECT toplam_puan, toplam_yildiz FROM etkinlikler WHERE id = $1', [id]);
+    if (etkRow.length > 0) {
+      if (etkRow[0].toplam_puan != null && etkRow[0].toplam_puan > 0) await dagitPuanlari(id);
+      if (etkRow[0].toplam_yildiz != null && etkRow[0].toplam_yildiz > 0) await dagitYildizlari(id);
+    }
     res.status(201).json({
       success: true,
       message: 'Soru başarıyla eklendi',

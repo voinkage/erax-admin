@@ -305,6 +305,35 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
       await pool.query('UPDATE kitap_sorulari SET dogru_cevap_id = $1 WHERE id = $2', [dogruCevapId, soruId]);
     }
 
+    // Toplu dağıtım: yeni soru eklendikten sonra puan/yıldızı tüm sorulara yeniden dağıt
+    const { rows: kitapRow } = await pool.query('SELECT toplam_puan, toplam_yildiz FROM kitaplar WHERE id = $1', [id]);
+    if (kitapRow.length > 0) {
+      const np = numOrNull(kitapRow[0].toplam_puan);
+      const ny = numOrNull(kitapRow[0].toplam_yildiz);
+      const { rows: kitapSorular } = await pool.query(
+        'SELECT id FROM kitap_sorulari WHERE kitap_id = $1 ORDER BY soru_numarasi',
+        [id]
+      );
+      if (kitapSorular.length > 0) {
+        if (np != null && np > 0) {
+          const basePuan = Math.floor(np / kitapSorular.length);
+          const modPuan = np % kitapSorular.length;
+          for (let i = 0; i < kitapSorular.length; i++) {
+            const puan = basePuan + (i < modPuan ? 1 : 0);
+            await pool.query('UPDATE kitap_sorulari SET soru_puan = $1 WHERE id = $2', [puan, kitapSorular[i].id]);
+          }
+        }
+        if (ny != null && ny > 0) {
+          const baseYildiz = Math.floor(ny / kitapSorular.length);
+          const modYildiz = ny % kitapSorular.length;
+          for (let i = 0; i < kitapSorular.length; i++) {
+            const yildiz = baseYildiz + (i < modYildiz ? 1 : 0);
+            await pool.query('UPDATE kitap_sorulari SET soru_yildiz = $1 WHERE id = $2', [yildiz, kitapSorular[i].id]).catch(() => {});
+          }
+        }
+      }
+    }
+
     return res.status(201).json({ success: true, message: 'Soru eklendi', data: { id: soruId } });
   } catch (error) {
     console.error('Kitap soru ekleme hatası:', error);
