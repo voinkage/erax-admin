@@ -254,8 +254,12 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
       return res.status(400).json({ success: false, message: validation.message });
     }
 
-    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar } = body;
+    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar, asama_ileri_butonu_gorsel, asama_geri_butonu_gorsel } = body;
     const isAsamali = asamali === true || asamali === 'true' || asamali === 1 || asamali === '1';
+    const mergedEkBilgi = { ...(typeof ek_bilgi === 'object' && ek_bilgi ? ek_bilgi : {}) };
+    if (asama_ileri_butonu_gorsel !== undefined) mergedEkBilgi.asama_ileri_butonu_gorsel = (asama_ileri_butonu_gorsel != null && String(asama_ileri_butonu_gorsel).trim() !== '') ? String(asama_ileri_butonu_gorsel).trim() : null;
+    if (asama_geri_butonu_gorsel !== undefined) mergedEkBilgi.asama_geri_butonu_gorsel = (asama_geri_butonu_gorsel != null && String(asama_geri_butonu_gorsel).trim() !== '') ? String(asama_geri_butonu_gorsel).trim() : null;
+    const ekBilgiInsert = (Object.keys(mergedEkBilgi).length > 0) ? mergedEkBilgi : null;
 
     const { rows: kitaplar } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
     if (kitaplar.length === 0) return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
@@ -278,7 +282,7 @@ router.post('/:id/sorular', authenticateToken, authorizeRoles('admin', 'ogretmen
     const { rows: soruRows } = await pool.query(
       `INSERT INTO kitap_sorulari (kitap_id, soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, dogru_cevap_id, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenek_arka_plan_gorseli, video_url, soru_gorseli, asamali, aktif)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, false) RETURNING id`,
-      [id, finalSira, soru_turu, soruAdiVal, soruMetniVal, soru_puan || null, ses_dosyasi || null, null, ek_bilgi || null, yonergeVal, yonergeSesVal, secArka, videoUrlVal, soruGorseliVal, asamaliVal]
+      [id, finalSira, soru_turu, soruAdiVal, soruMetniVal, soru_puan || null, ses_dosyasi || null, null, ekBilgiInsert, yonergeVal, yonergeSesVal, secArka, videoUrlVal, soruGorseliVal, asamaliVal]
     );
     const soruId = soruRows[0].id;
 
@@ -402,12 +406,12 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
   try {
     if (!pool) return res.status(503).json({ success: false, message: 'Kitaplar servisi yapılandırılmamış' });
     const { id, soruId } = req.params;
-    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar, aktif } = req.body;
+    const { soru_numarasi, soru_turu, soru_adi, soru_metni, soru_puan, ses_dosyasi, video_url, ek_bilgi, yonerge, yonerge_ses_dosyasi, secenekler, secenek_arka_plan_gorseli, soru_gorseli, asamali, asamalar, aktif, asama_ileri_butonu_gorsel, asama_geri_butonu_gorsel } = req.body;
 
     const { rows: kitaplar } = await pool.query('SELECT id FROM kitaplar WHERE id = $1', [id]);
     if (kitaplar.length === 0) return res.status(404).json({ success: false, message: 'Kitap bulunamadı' });
 
-    const turResult = await pool.query('SELECT soru_turu FROM kitap_sorulari WHERE id = $1 AND kitap_id = $2', [soruId, id]);
+    const turResult = await pool.query('SELECT soru_turu, ek_bilgi FROM kitap_sorulari WHERE id = $1 AND kitap_id = $2', [soruId, id]);
     const guncelTur = soru_turu || turResult.rows[0]?.soru_turu;
     const updateValidation = validateSoruGuncelle(req.body, guncelTur, { kitaplarMi: true });
     if (!updateValidation.ok) {
@@ -425,11 +429,19 @@ router.put('/:id/sorular/:soruId(\\d+)', authenticateToken, authorizeRoles('admi
     const asamaliVal = !!isAsamali;
     const aktifVal = aktif === true || aktif === 'true' || aktif === 1 ? true : (aktif === false || aktif === 'false' || aktif === 0 ? false : null);
 
+    const eskiEkBilgi = turResult.rows[0] && turResult.rows[0].ek_bilgi != null
+      ? (typeof turResult.rows[0].ek_bilgi === 'object' ? turResult.rows[0].ek_bilgi : (() => { try { return JSON.parse(turResult.rows[0].ek_bilgi); } catch { return {}; } })())
+      : {};
+    const mergedEkBilgiPut = { ...eskiEkBilgi, ...(typeof ek_bilgi === 'object' && ek_bilgi ? ek_bilgi : {}) };
+    if (asama_ileri_butonu_gorsel !== undefined) mergedEkBilgiPut.asama_ileri_butonu_gorsel = (asama_ileri_butonu_gorsel != null && String(asama_ileri_butonu_gorsel).trim() !== '') ? String(asama_ileri_butonu_gorsel).trim() : null;
+    if (asama_geri_butonu_gorsel !== undefined) mergedEkBilgiPut.asama_geri_butonu_gorsel = (asama_geri_butonu_gorsel != null && String(asama_geri_butonu_gorsel).trim() !== '') ? String(asama_geri_butonu_gorsel).trim() : null;
+    const ekBilgiUpdate = (Object.keys(mergedEkBilgiPut).length > 0) ? mergedEkBilgiPut : null;
+
     const setAktif = aktifVal !== null ? ', aktif = $' + (soru_numarasi != null ? '14' : '13') : '';
     const whereIdNum = soru_numarasi != null ? (aktifVal !== null ? 15 : 14) : (aktifVal !== null ? 14 : 13);
     const baseParams = soru_numarasi != null
-      ? [guncelTur, soru_puan || null, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, secArka, videoUrlVal, soruGorseliVal, asamaliVal, soru_numarasi, soruId]
-      : [guncelTur, soru_puan || null, ses_dosyasi || null, soruAdiVal, soruMetniVal, ek_bilgi || null, yonergeVal, yonergeSesVal, secArka, videoUrlVal, soruGorseliVal, asamaliVal, soruId];
+      ? [guncelTur, soru_puan || null, ses_dosyasi || null, soruAdiVal, soruMetniVal, ekBilgiUpdate, yonergeVal, yonergeSesVal, secArka, videoUrlVal, soruGorseliVal, asamaliVal, soru_numarasi, soruId]
+      : [guncelTur, soru_puan || null, ses_dosyasi || null, soruAdiVal, soruMetniVal, ekBilgiUpdate, yonergeVal, yonergeSesVal, secArka, videoUrlVal, soruGorseliVal, asamaliVal, soruId];
     const updateParams = aktifVal !== null ? baseParams.concat([aktifVal]) : baseParams;
     await pool.query(
       `UPDATE kitap_sorulari SET soru_turu = $1, soru_puan = $2, ses_dosyasi = $3, soru_adi = $4, soru_metni = $5, dogru_cevap_id = NULL, ek_bilgi = $6, yonerge = $7, yonerge_ses_dosyasi = $8, secenek_arka_plan_gorseli = $9, video_url = $10, soru_gorseli = $11, asamali = $12${soru_numarasi != null ? ', soru_numarasi = $13' : ''}${setAktif} WHERE id = $${whereIdNum}`,
